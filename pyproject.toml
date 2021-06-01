@@ -1,0 +1,20 @@
+[build-system]
+requires = ["flit_core >=2,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.metadata]
+module = "poco"
+author = "sashakile"
+author-email = "saxa.kile@gmail.com"
+home-page = "https://github.com/sashakile/poco"
+description-file = "README.md"
+
+[tool.flit.metadata.requires-extra]
+test = [
+    "pytest",
+    "pytest-cov",
+]
+
+dev = [
+    "pylint",
+]
