@@ -1,4 +1,6 @@
-# poco
+# poxo
+*(poco)*
+
 *Pequeño y perezoso panda | Small and lazy panda*
 [EN](#Intro) | [ES](#Introducción)
 
@@ -16,7 +18,7 @@ This library is intended to be a learning tool for programming while creating a 
 ## Ejemplo | Example
 
 ```python
-import poco as po
+import poxo as po
 
 s = po.Series() 
 ```

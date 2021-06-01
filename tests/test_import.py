@@ -1,6 +1,6 @@
 def test_import():
-    import poco
+    import poxo
 
 def test_import_series():
-    from poco import Series
+    from poxo import Series
     s = Series()

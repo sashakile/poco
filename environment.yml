@@ -1,4 +1,4 @@
-name: poco_dev
+name: poxo_dev
 channels:
   - conda-forge
   - defaults
