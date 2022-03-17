@@ -7,4 +7,4 @@ A small lazy panda
 
 __version__ = "0.1.0"
 
-from .poxo import Series
+from .poxo import Series, DataFrame
