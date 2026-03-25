@@ -1,0 +1,35 @@
+# poxo (poco)
+
+> Pequeño y perezoso panda — Small and lazy panda
+
+poxo is a learning-oriented Python library that recreates a simplified version
+of [pandas](https://github.com/pandas-dev/pandas). The goal is to learn
+programming practices by building core data structures from scratch.
+
+## Core Data Structures
+
+- **Series**: A one-dimensional labeled array with `index` and `values`.
+- **DataFrame**: A two-dimensional labeled data structure with `index` and
+  `columns` (stored as a dict).
+
+## Usage
+
+```python
+import poxo as po
+
+s = po.Series()
+df = po.DataFrame()
+```
+
+## Development
+
+- Build system: flit
+- Testing: pytest
+- Linting: pylint
+- Environment: conda (environment.yml)
+
+```bash
+conda env create --name poxo_dev --file environment.yml
+flit install --deps develop
+pytest
+```

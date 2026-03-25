@@ -8,4 +8,3 @@ flit install --deps develop
 
 pytest
 ```
-

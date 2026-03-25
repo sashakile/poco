@@ -18,3 +18,13 @@ test = [
 dev = [
     "pylint",
 ]
+
+[tool.pytest.ini_options]
+addopts = "--cov=poxo --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["poxo"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

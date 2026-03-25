@@ -1,0 +1,22 @@
+[default.extend-words]
+# Spanish words used in the project
+poxo = "poxo"
+poco = "poco"
+ser = "ser"
+# Git hashes
+ded = "ded"
+
+[default.extend-identifiers]
+perezoso = "perezoso"
+enfocada = "enfocada"
+herramienta = "herramienta"
+conocida = "conocida"
+renombrar = "renombrar"
+inicializar = "inicializar"
+
+[files]
+extend-exclude = [
+    ".wai/",
+    ".beads/",
+    ".vale/styles/",
+]

@@ -1,3 +1,5 @@
+[![tracked with wai](https://img.shields.io/badge/tracked%20with-wai-blue)](https://github.com/charly-vibes/wai)
+
 # poxo
 *(poco)*
 
@@ -6,7 +8,7 @@
 
 ## Introducción
 
-Esta librería esta enfocada a ser una herramienta para aprender prácticas de programación creando una copia simple de la conocida librería [pandas](https://github.com/pandas-dev/pandas) 
+Esta librería esta enfocada a ser una herramienta para aprender prácticas de programación creando una copia simple de la conocida librería [pandas](https://github.com/pandas-dev/pandas)
 
 
 ## Intro
@@ -20,5 +22,5 @@ This library is intended to be a learning tool for programming while creating a 
 ```python
 import poxo as po
 
-s = po.Series() 
+s = po.Series()
 ```
