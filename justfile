@@ -4,17 +4,21 @@
 default:
     @just --list
 
+# Sync dependencies
+sync:
+    uv sync
+
 # Run tests
 test:
-    pytest
+    uv run pytest
 
 # Run tests with coverage
 coverage:
-    pytest --cov=poxo --cov-report=term-missing --cov-fail-under=80
+    uv run pytest --cov=poxo --cov-report=term-missing --cov-fail-under=80
 
 # Lint with pylint
 lint:
-    pylint poxo
+    uv run pylint poxo
 
 # Check spelling
 spellcheck:
@@ -26,7 +30,3 @@ prose:
 
 # Run all checks
 check: spellcheck lint test
-
-# Install in development mode
-dev:
-    flit install --deps develop

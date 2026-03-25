@@ -1,20 +1,27 @@
+[project]
+name = "poxo"
+version = "0.1.0"
+description = "Pure Python DataFrame library with algebraic foundations"
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "sashakile", email = "saxa.kile@gmail.com" },
+]
+requires-python = ">=3.10"
+
+[project.urls]
+Homepage = "https://github.com/sashakile/poco"
+
 [build-system]
-requires = ["flit_core >=2,<4"]
-build-backend = "flit_core.buildapi"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.flit.metadata]
-module = "poxo"
-author = "sashakile"
-author-email = "saxa.kile@gmail.com"
-home-page = "https://github.com/sashakile/poco"
-description-file = "README.md"
-
-[tool.flit.metadata.requires-extra]
+[dependency-groups]
 test = [
     "pytest",
     "pytest-cov",
+    "hypothesis",
 ]
-
 dev = [
     "pylint",
 ]

@@ -2,34 +2,61 @@
 
 > Pequeño y perezoso panda — Small and lazy panda
 
-poxo is a learning-oriented Python library that recreates a simplified version
-of [pandas](https://github.com/pandas-dev/pandas). The goal is to learn
-programming practices by building core data structures from scratch.
+poxo is a pure Python DataFrame library for small exploratory and teaching
+examples. It is not a pandas clone — it identifies the true abstract interfaces
+needed for data operations, grounded in category theory.
 
-## Core Data Structures
+## Design Principles
 
-- **Series**: A one-dimensional labeled array with `index` and `values`.
-- **DataFrame**: A two-dimensional labeled data structure with `index` and
-  `columns` (stored as a dict).
+- **Lazy-first**: operations build expression trees, materialized on demand
+- **Algebraic**: operations follow Spivak's Σ ⊣ Δ ⊣ Π adjoint triple
+- **Composable**: pipe syntax via `|` operator, transducer-inspired pipelines
+- **Swappable**: abstract Storage and Compute backends (pure Python default)
+- **Strict**: raises early on errors, no silent coercion
+- **Pure Python**: no required dependencies
+
+## Architecture
+
+- Schema = category, DataFrame = functor from schema to Set
+- Lazy IR (expression trees as free monad) enables backend-agnostic optimization
+- Column-primary storage, row access as view
+- HAMT for structural parts, contiguous arrays for data
+- Symbolic column references (`_.col`), no strings
+
+## Core Operations (Σ ⊣ Δ ⊣ Π)
+
+- **Δ (pullback)**: select, project, rename — structural transformations
+- **Σ (left Kan extension)**: groupby, aggregate, combine — summarization
+- **Π (right Kan extension)**: join, normalize — relational composition
 
 ## Usage
 
 ```python
 import poxo as po
 
-s = po.Series()
-df = po.DataFrame()
+df = po.DataFrame({"name": ["Ana", "Luis"], "age": [30, 25]})
+result = df | po.where(_.age > 25) | po.select(_.name)
 ```
 
 ## Development
 
-- Build system: flit
-- Testing: pytest
-- Linting: pylint
-- Environment: conda (environment.yml)
+- Package manager: uv
+- Build: hatchling
+- Test: pytest + hypothesis (property-based for algebraic laws)
+- Lint: pylint
+- Hooks: prek (pre-commit)
+- CI: GitHub Actions (Python 3.10–3.12)
 
 ```bash
-conda env create --name poxo_dev --file environment.yml
-flit install --deps develop
-pytest
+uv sync
+just test
 ```
+
+## Influences
+
+- Spivak's functorial data migration (arXiv:1009.1166)
+- AlgebraicJulia ACSets.jl
+- Clojure transducers
+- Julia DataFrames.jl
+- ibis (lazy IR + multi-backend)
+- siuba (symbolic column refs)

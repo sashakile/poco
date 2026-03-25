@@ -3,6 +3,9 @@
 poxo = "poxo"
 poco = "poco"
 ser = "ser"
+dependencias = "dependencias"
+comandos = "comandos"
+pase = "pase"
 # Git hashes
 ded = "ded"
 
