@@ -17,6 +17,28 @@ The system SHALL define a `Reducer` protocol with three methods:
 - **WHEN** `po.reduce(reducer, collection)` is called
 - **THEN** it SHALL call `init()`, then `step()` for each item, then `complete()`
 
+### Requirement: Reducer laws
+
+Reducers SHALL satisfy the following laws, verified via property-based testing:
+
+1. **Determinism**: `step(s, a)` SHALL always return the same result for same `s` and `a`
+2. **Empty input validity**: `complete(init())` SHALL return a valid, well-defined result
+3. **Resumability**: reducing `xs ++ ys` SHALL equal resuming the fold of `ys`
+   from the accumulated state after `xs` (when no `Reduced` is returned)
+4. **Reduced validity**: if `step` returns `Reduced(s)`, `complete(s)` SHALL be valid
+5. **Reduced idempotence**: `Reduced(Reduced(s))` SHALL be treated as `Reduced(s)`
+
+#### Scenario: Empty input produces valid result
+
+- **WHEN** `po.reduce(po.count, [])` is called
+- **THEN** `complete(init())` SHALL return `0`
+
+#### Scenario: Resumability
+
+- **WHEN** `po.reduce(po.sum_reducer, [1, 2, 3, 4, 5])` is called
+- **THEN** the result SHALL equal reducing `[1, 2]` to get intermediate state,
+  then reducing `[3, 4, 5]` from that state
+
 ### Requirement: Reduced sentinel for early termination
 
 The system SHALL provide a `Reduced` wrapper type. When `step()` returns
@@ -51,15 +73,44 @@ inner reducer.
 - **WHEN** a `mapping(f)` transducer wraps a `to_list` reducer
 - **THEN** the resulting reducer SHALL accumulate `f(item)` for each item
 
-### Requirement: Transducer composition
+### Requirement: Transducer-reducer compatibility laws
 
-Transducers SHALL compose via the `|` operator or a `comp` function.
+Transducers wrapping reducers SHALL satisfy the following laws:
+
+1. **Init preservation**: `xf(r).init()` SHALL equal `r.init()` by default
+2. **Complete propagation**: `xf(r).complete(s)` SHALL call `r.complete(...)` on some state
+3. **Reduced propagation**: if inner `step` returns `Reduced`, outer SHALL propagate it
+
+#### Scenario: Init preserved
+
+- **WHEN** `filtering(pred)` wraps `to_list`
+- **THEN** `filtering(pred)(to_list).init()` SHALL equal `to_list.init()`
+
+#### Scenario: Complete propagated
+
+- **WHEN** any transducer wraps a `mean` reducer
+- **THEN** `complete` SHALL be called on the inner reducer to finalize the result
+
+### Requirement: Transducer composition is left-to-right
+
+Transducers SHALL compose via the `|` operator in left-to-right data flow
+order: `xf1 | xf2` means apply `xf1` first, then `xf2`.
+
 Composition SHALL be associative: `(a | b) | c` equals `a | (b | c)`.
 
-#### Scenario: Compose filter and map
+Internally, left-to-right data flow requires right-to-left function composition:
+`(xf1 | xf2)(reducer) == xf1(xf2(reducer))`.
 
-- **WHEN** `filtering(is_positive) | mapping(double)` is composed
-- **THEN** applying it to `[-1, 2, -3, 4]` with `to_list` SHALL produce `[4, 8]`
+#### Scenario: Left-to-right data flow
+
+- **WHEN** `filtering(lambda x: x > 0) | mapping(lambda x: x * 10)` is composed
+- **THEN** applying it to `[-1, 2, -3, 4]` with `to_list` SHALL produce `[20, 40]`
+  (filter first: `[2, 4]`, then map: `[20, 40]`)
+
+#### Scenario: Non-commutative order matters
+
+- **WHEN** `mapping(lambda x: x - 3) | filtering(lambda x: x > 0)` is applied to `[1, 2, 3, 4, 5]`
+- **THEN** the result SHALL be `[1, 2]` (map first: `[-2, -1, 0, 1, 2]`, then filter: `[1, 2]`)
 
 #### Scenario: Composition is associative
 
@@ -68,27 +119,26 @@ Composition SHALL be associative: `(a | b) | c` equals `a | (b | c)`.
 
 #### Scenario: Cross-layer composition
 
-- **WHEN** a high-level transducer (`po.where(Person.age > 25)`) is composed
+- **WHEN** a high-level pipeline step (`po.where(Person.age > 25)`) is composed
   with a low-level transducer (`po.mapping(some_fn)`) via `|`
-- **THEN** the composition SHALL produce a valid transducer, because both
-  implement the same `Transducer` protocol (reducer -> reducer)
+- **THEN** the composition SHALL produce a valid pipeline step, because both
+  implement compatible composition protocols
 
 ### Requirement: Identity transducer
 
 The system SHALL provide an identity transducer that passes through the
-inner reducer unchanged. `comp()` with no arguments SHALL return the identity
-transducer. The identity transducer SHALL be the neutral element of
-transducer composition (monoid identity).
+inner reducer unchanged. `comp()` with no arguments SHALL return the identity.
+The identity transducer SHALL be the neutral element of composition (monoid identity).
 
 #### Scenario: Identity leaves reducer unchanged
 
 - **WHEN** the identity transducer wraps a `to_list` reducer
 - **THEN** the resulting reducer SHALL behave identically to `to_list`
 
-#### Scenario: comp() with no args returns identity
+#### Scenario: Identity is neutral element
 
-- **WHEN** `po.comp()` is called with no arguments
-- **THEN** it SHALL return the identity transducer
+- **WHEN** `identity | xf` and `xf | identity` are composed
+- **THEN** both SHALL produce the same results as `xf` alone
 
 ### Requirement: Core transducers (low-level)
 
@@ -109,27 +159,34 @@ plain Python callables. These are the low-level building blocks:
 - **WHEN** `dropping(2)` is applied to `[1, 2, 3, 4, 5]`
 - **THEN** the result SHALL be `[3, 4, 5]`
 
-### Requirement: High-level transducer constructors (Expr-based)
+### Requirement: High-level pipeline step constructors (Expr-based)
 
-The system SHALL provide high-level transducer constructors that accept `Expr`
-objects (see `expression/spec.md`) and produce transducers. These build on
-the low-level transducers:
-- `where(expr)` — builds a `filtering` transducer that evaluates the Expr per row
-- `select(*exprs)` — builds a project operation from column reference Exprs
+The system SHALL provide high-level constructors that accept `Expr` objects
+(see `expression/spec.md`) and produce pipeline steps. These build on the
+low-level transducers and add schema transforms:
+
+- `where(expr)` — data: filtering transducer evaluating Expr per row; schema: Identity
+- `select(*exprs)` — data: column dropper; schema: Project(selected columns)
 
 These are the primary user-facing API. The low-level `filtering`, `mapping`,
 etc. are also public for advanced use and custom transducer construction.
 
-Transducers built from `Expr` objects SHALL store `required_columns` (the set
-of column names referenced by the Expr tree). This enables schema validation
-at pipe time (see `pipeline/spec.md`).
+Pipeline steps built from `Expr` objects SHALL store `required_columns` (the
+set of column names referenced by the Expr tree). This enables schema
+validation at pipe time (see `pipeline/spec.md`).
 
 #### Scenario: where wraps filtering with Expr evaluation
 
 - **WHEN** `po.where(Person.age > 25)` is applied
 - **THEN** it SHALL behave equivalently to `filtering(lambda row: row["age"] > 25)`
+  with schema transform `Identity`
 
 #### Scenario: where stores required columns
 
 - **WHEN** `po.where(Person.age > 25)` is created
-- **THEN** the transducer's `required_columns` SHALL be `{"age"}`
+- **THEN** the pipeline step's `required_columns` SHALL be `{"age"}`
+
+#### Scenario: select produces project schema transform
+
+- **WHEN** `po.select(Person.name, Person.age)` is created
+- **THEN** the schema transform SHALL be `Project(["name", "age"])`

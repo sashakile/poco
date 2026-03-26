@@ -48,7 +48,9 @@ All dicts MUST have the same keys.
 
 The DataFrame SHALL store data in column-primary format internally (dict of
 column name to list of values). The DataFrame SHALL implement `__iter__`
-yielding rows as dicts, and `__len__` returning the number of rows.
+(yielding rows as dicts) and `__len__` (returning the number of rows).
+Both `__iter__` and `__len__` SHALL trigger materialization if the DataFrame
+has an uncollected plan.
 
 #### Scenario: Row iteration yields dicts
 

@@ -1,102 +1,115 @@
 ## ADDED Requirements
 
-### Requirement: Pipe operator applies transducer to DataFrame
+### Requirement: Pipe operator extends DataFrame plan
 
-`DataFrame | transducer` SHALL return a `LazyFrame` that records the
-transducer as part of its execution plan. The data SHALL NOT be processed
-until `collect()` is called.
+`DataFrame | step` SHALL return a new `DataFrame` with the pipeline step
+appended to its plan. The original DataFrame SHALL NOT be modified. No data
+SHALL be processed until materialization is triggered.
 
-#### Scenario: Pipe creates LazyFrame
+#### Scenario: Pipe creates new DataFrame with extended plan
 
 - **WHEN** `df | po.where(Person.age > 25)`
-- **THEN** the result SHALL be a `LazyFrame` with the filter in its plan
+- **THEN** the result SHALL be a new `DataFrame` with the filter in its plan
 - **AND** no rows SHALL have been processed yet
-
-### Requirement: LazyFrame stacks transducers
-
-`LazyFrame | transducer` SHALL return a new `LazyFrame` with the transducer
-appended to the plan. The original LazyFrame SHALL NOT be modified.
+- **AND** the original `df` SHALL be unchanged
 
 #### Scenario: Chain multiple operations
 
 - **WHEN** `df | po.where(Person.age > 25) | po.select(Person.name)`
-- **THEN** the result SHALL be a `LazyFrame` with both filter and project in its plan
+- **THEN** the result SHALL be a `DataFrame` with both filter and project in its plan
 
-#### Scenario: Original LazyFrame is immutable
+#### Scenario: DataFrame is immutable value object
 
-- **WHEN** `lazy1 = df | po.where(Person.age > 25)` then `lazy2 = lazy1 | po.select(Person.name)`
-- **THEN** `lazy1` SHALL still contain only the filter (not the select)
-- **AND** `lazy2` SHALL contain both filter and select
+- **WHEN** `df2 = df | po.where(Person.age > 25)` then `df3 = df2 | po.select(Person.name)`
+- **THEN** `df` SHALL have no steps in its plan
+- **AND** `df2` SHALL have only the filter
+- **AND** `df3` SHALL have both filter and select
 
-### Requirement: LazyFrame collect materializes
+### Requirement: DataFrame is always lazy
 
-`LazyFrame.collect()` SHALL execute the recorded plan and return an eager
-`DataFrame` with the results. Calling `collect()` SHALL NOT modify the
-LazyFrame — the plan MAY be re-executed on subsequent calls.
+DataFrame SHALL be lazy by default. Operations via `|` extend the plan without
+executing it. Materialization (executing the plan) SHALL be triggered by:
+- `repr(df)` / `_repr_html_(df)` — display
+- `for row in df` — iteration via `__iter__`
+- `len(df)` — row count via `__len__`
+- `df.collect()` — explicit force
 
-#### Scenario: Collect executes the plan
+After materialization, the result SHALL be cached. Extending the plan with
+another `|` step SHALL invalidate the cache.
 
-- **WHEN** `(df | po.where(Person.age > 25)).collect()`
-- **THEN** the result SHALL be an eager `DataFrame` containing only rows where age > 25
+#### Scenario: Display triggers collection
 
-#### Scenario: Collect is repeatable
+- **WHEN** `repr(df)` is called on a DataFrame with a non-empty plan
+- **THEN** the plan SHALL be executed and the result displayed as a table
 
-- **WHEN** `lazy = df | po.where(Person.age > 25)` then `r1 = lazy.collect()` and `r2 = lazy.collect()`
-- **THEN** `r1` and `r2` SHALL be equal DataFrames
-- **AND** the plan SHALL be re-executed on each call
+#### Scenario: Iteration triggers collection
 
-### Requirement: LazyFrame display shows plan
+- **WHEN** `for row in df` is used on a DataFrame with a non-empty plan
+- **THEN** the plan SHALL be executed and rows yielded as dicts
 
-`LazyFrame.__repr__` SHALL display the execution plan and the schema, but
-SHALL NOT display data or trigger collection.
+#### Scenario: Collect caches results
 
-#### Scenario: Display lazy plan
+- **WHEN** `df.collect()` is called, then `repr(df)` is called
+- **THEN** `collect()` SHALL execute the plan and cache the result
+- **AND** `repr(df)` SHALL use the cached result (no re-execution)
 
-- **WHEN** `repr(lazy_df)` is called
-- **THEN** the output SHALL include the schema and plan steps (e.g., `where(age > 25)`)
-- **AND** no data SHALL be materialized
+#### Scenario: Extending plan invalidates cache
 
-### Requirement: Transducer-to-transducer pipe composes
+- **WHEN** `df.collect()` is called, then `df2 = df | po.where(Person.age > 25)`
+- **THEN** `df2` SHALL NOT use df's cached result for its own collection
+  (df2 has a different plan)
 
-`transducer | transducer` SHALL return a new composed transducer. The composed
-transducer SHALL be reusable across different DataFrames.
+### Requirement: DataFrame display shows plan when uncollected
+
+When a DataFrame has not yet been collected, `repr(df)` SHALL first display
+the plan and schema, then trigger collection and display the result table.
+This makes the lazy-to-eager transition visible to the user.
+
+#### Scenario: Uncollected DataFrame shows plan then data
+
+- **WHEN** `repr(df)` is called on an uncollected DataFrame with plan `[where(age > 25)]`
+- **THEN** the output SHALL include the plan steps and schema
+- **AND** the output SHALL include the materialized data table
+
+### Requirement: Pipeline step composition
+
+`step | step` SHALL return a new composed pipeline step. Composition SHALL
+be component-wise: data transforms compose via transducer composition,
+schema transforms compose via function composition. Both are left-to-right.
 
 #### Scenario: Compose and reuse pipeline
 
 - **WHEN** `pipeline = po.where(Person.age > 25) | po.select(Person.name)`
-- **THEN** `pipeline(df1)` and `pipeline(df2)` SHALL both produce the expected
+- **THEN** `pipeline` SHALL be a composed pipeline step
+- **AND** `df1 | pipeline` and `df2 | pipeline` SHALL both produce the expected
   filtered and projected result
 
-### Requirement: Transducer callable convenience
-
-`transducer(df)` SHALL be equivalent to `(df | transducer).collect()`.
-This provides a convenience for one-shot application.
-
-#### Scenario: Call transducer on DataFrame
+#### Scenario: Pipeline step is callable
 
 - **WHEN** `po.where(Person.age > 25)(df)`
-- **THEN** the result SHALL be the same as `(df | po.where(Person.age > 25)).collect()`
+- **THEN** it SHALL be equivalent to `df | po.where(Person.age > 25)`
+  (returns a lazy DataFrame, does NOT force collection)
 
-### Requirement: head as take transducer (non-mutating)
+### Requirement: head as take + display
 
-`LazyFrame.head(n)` SHALL create a new LazyFrame with a `taking(n)` transducer
-appended, then collect it. The original LazyFrame SHALL NOT be modified.
+`DataFrame.head(n)` SHALL create a new DataFrame with a `taking(n)` step
+appended, then trigger display. The original DataFrame SHALL NOT be modified.
 Early termination SHALL be supported via the `Reduced` protocol.
 
 #### Scenario: Head returns n rows without mutating
 
-- **WHEN** `lazy = df | po.where(Person.age > 25)` then `result = lazy.head(5)`
-- **THEN** `result` SHALL be an eager `DataFrame` with at most 5 matching rows
-- **AND** `lazy` SHALL still be usable without the take(5) in its plan
+- **WHEN** `df2 = df | po.where(Person.age > 25)` then `df2.head(5)`
+- **THEN** the display SHALL show at most 5 matching rows
+- **AND** `df2` SHALL still be usable without the take(5) in its plan
 
 ### Requirement: Schema mismatch on pipe raises early error
 
-The system SHALL raise a `SchemaError` when a transducer built from one schema
-is applied via `|` to a DataFrame with an incompatible schema. The error SHALL
-be raised at pipe time (when `|` is evaluated), not at collect time.
+The system SHALL raise a `SchemaError` when a pipeline step built from one
+schema is applied via `|` to a DataFrame with an incompatible schema. The
+error SHALL be raised at pipe time (when `|` is evaluated), not at collection.
 
 Schema validation uses the `required_columns` set stored on Expr-based
-transducers (see `transducer/spec.md`). Low-level transducers without
+pipeline steps (see `transducer/spec.md`). Low-level transducers without
 `required_columns` SHALL bypass schema validation.
 
 #### Scenario: Incompatible schema raises on pipe
@@ -109,38 +122,39 @@ transducers (see `transducer/spec.md`). Low-level transducers without
 #### Scenario: Low-level transducers bypass schema check
 
 - **WHEN** `po.filtering(lambda row: row["x"] > 0)` is applied via `df | xf`
-- **THEN** no `SchemaError` SHALL be raised at pipe time (no `required_columns`)
+- **THEN** no `SchemaError` SHALL be raised at pipe time
 
-### Requirement: where builds filtering transducer from Expr
+### Requirement: where builds filtering pipeline step from Expr
 
-`po.where(expr)` SHALL accept an `Expr` and return a transducer that filters
-rows where the expression evaluates to true.
+`po.where(expr)` SHALL accept an `Expr` and return a pipeline step with:
+- data transform: a filtering transducer evaluating the Expr per row
+- schema transform: Identity (columns unchanged)
 
 #### Scenario: Where with expression
 
 - **WHEN** `po.where(Person.age > 25)` is applied to a DataFrame
-- **THEN** only rows where `age > 25` SHALL be included in the result
+- **THEN** only rows where `age > 25` SHALL be included after collection
 
-### Requirement: select builds project operation from Exprs
+### Requirement: select builds project pipeline step from Exprs
 
 `po.select(*exprs)` SHALL accept one or more `Expr` (column references) and
-return an operation that projects the DataFrame to those columns. The result
-schema SHALL be auto-generated with only the selected columns.
+return a pipeline step with:
+- data transform: a transducer that keeps only the selected columns per row
+- schema transform: `Project(selected_column_names)`
 
-`select` is the user-facing API for the `project` primitive (Δ in Spivak's
-framework). Internally it operates on schema structure. It is implemented as
-a transducer for composability with the pipe operator.
+The result schema SHALL be auto-generated with only the selected columns.
 
 #### Scenario: Select columns
 
 - **WHEN** `po.select(Person.name)` is applied to a DataFrame with `name` and `age`
-- **THEN** the result SHALL have only the `name` column
+- **THEN** the result SHALL have only the `name` column after collection
 - **AND** the result schema SHALL reflect the reduced column set
 
 ### Requirement: User-facing reduce on DataFrame
 
 `po.reduce(reducer, df)` SHALL apply a reducer to a DataFrame's rows and
-return the final result. This is the user-facing API for the reduce primitive.
+return the final result. This forces collection and returns a scalar value.
+An optional `transducer` parameter applies a transducer to the reducer first.
 
 #### Scenario: Reduce DataFrame with sum
 
@@ -153,3 +167,20 @@ return the final result. This is the user-facing API for the reduce primitive.
 - **WHEN** `po.reduce(po.count, df, transducer=po.where(Person.age > 25))` is called
   where `df` has ages `[30, 20, 40]`
 - **THEN** the transducer SHALL filter to ages `[30, 40]` and the count SHALL be `2`
+
+### Requirement: comp composes left-to-right with named parameters
+
+`po.comp(first=xf1, second=xf2)` SHALL compose transducers or pipeline steps
+in left-to-right data flow order: `xf1` is applied first, then `xf2`.
+`po.comp(first=a, second=b)` SHALL be equivalent to `a | b`.
+`po.comp()` with no arguments SHALL return the identity.
+
+#### Scenario: comp matches pipe order
+
+- **WHEN** `po.comp(first=po.where(Person.age > 25), second=po.select(Person.name))`
+- **THEN** the result SHALL be the same as `po.where(Person.age > 25) | po.select(Person.name)`
+
+#### Scenario: comp with no args returns identity
+
+- **WHEN** `po.comp()` is called with no arguments
+- **THEN** it SHALL return an identity pipeline step that passes data and schema unchanged
