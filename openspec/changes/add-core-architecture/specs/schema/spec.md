@@ -62,6 +62,32 @@ schema is provided. The inferred schema SHALL be a dynamically created
 - **WHEN** a user creates `po.DataFrame({"age": [30, None, 25]})`
 - **THEN** the inferred type SHALL be `Optional[int]` (i.e., `int | None`)
 
+#### Scenario: All-None column raises SchemaError
+
+- **WHEN** a user creates `po.DataFrame({"age": [None, None, None]})`
+- **THEN** the system SHALL raise a `SchemaError` because the column type
+  cannot be inferred from all-None values
+- **AND** the error message SHALL suggest providing an explicit schema
+
+### Requirement: Supported column types
+
+The system SHALL support the following Python types as column dtypes:
+`int`, `float`, `str`, `bool`, and their `Optional` variants (`int | None`,
+`float | None`, `str | None`, `bool | None`). Schema declaration with
+unsupported types SHALL raise a `SchemaError` at decoration time naming
+the unsupported type and listing supported types.
+
+#### Scenario: Unsupported type in schema raises error
+
+- **WHEN** a user declares `@po.schema class Bad: data: dict`
+- **THEN** the system SHALL raise a `SchemaError` indicating `dict` is not
+  a supported column type and listing the supported types
+
+#### Scenario: Optional variant is supported
+
+- **WHEN** a user declares `@po.schema class Row: age: int | None`
+- **THEN** the schema SHALL accept `age` as `Optional[int]`
+
 ### Requirement: Empty DataFrame construction
 
 The system SHALL support constructing DataFrames with zero rows. A DataFrame
@@ -84,6 +110,11 @@ and no rows is valid but has an empty schema.
 #### Scenario: Empty dict, zero columns
 
 - **WHEN** `po.DataFrame({})`
+- **THEN** a DataFrame with 0 columns and 0 rows SHALL be created
+
+#### Scenario: Empty list of rows, zero columns
+
+- **WHEN** `po.DataFrame([])`
 - **THEN** a DataFrame with 0 columns and 0 rows SHALL be created
 
 #### Scenario: Filter removes all rows

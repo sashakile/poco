@@ -58,6 +58,13 @@ proceed to `complete()` with the unwrapped accumulator.
 - **THEN** `reduce` SHALL NOT call `step` on remaining items
 - **AND** `complete` SHALL be called with the unwrapped accumulator
 
+#### Scenario: Reduced flattens on construction
+
+- **WHEN** `Reduced(Reduced(value))` is constructed
+- **THEN** it SHALL be equivalent to `Reduced(value)` — the constructor
+  SHALL unwrap any inner `Reduced` automatically, enforcing the idempotence
+  law at construction rather than requiring callers to handle nesting
+
 #### Scenario: Reduced propagates through transducers
 
 - **WHEN** a `taking(n)` transducer wraps a reducer and n items have been taken
@@ -167,6 +174,26 @@ plain Python callables. These are the low-level building blocks:
 
 - **WHEN** `dropping(2)` is applied to `[1, 2, 3, 4, 5]`
 - **THEN** the result SHALL be `[3, 4, 5]`
+
+#### Scenario: Taking with zero returns empty
+
+- **WHEN** `taking(0)` is applied to `[1, 2, 3]`
+- **THEN** the result SHALL be `[]`
+
+#### Scenario: Taking with negative raises error
+
+- **WHEN** `taking(-1)` is called
+- **THEN** the system SHALL raise a `ValueError`
+
+#### Scenario: Dropping with zero is identity
+
+- **WHEN** `dropping(0)` is applied to `[1, 2, 3]`
+- **THEN** the result SHALL be `[1, 2, 3]`
+
+#### Scenario: Dropping with negative raises error
+
+- **WHEN** `dropping(-1)` is called
+- **THEN** the system SHALL raise a `ValueError`
 
 ### Requirement: Built-in reducers
 

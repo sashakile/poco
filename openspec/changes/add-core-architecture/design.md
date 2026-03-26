@@ -96,9 +96,10 @@ Alternatives considered:
 
 **`__eq__` trade-off**: `Expr.__eq__` returns an `Expr` (not `bool`), enabling
 `Person.age == 30` as a query expression. This breaks normal Python equality
-semantics. To preserve dict/set behavior, `Expr.__hash__` is implemented based
-on structural identity. A separate `.equals(other)` method returns `bool` for
-actual Expr comparison.
+semantics. Because `__eq__` does not return `bool`, `Expr` is explicitly
+unhashable (`__hash__ = None`). Any collections of Expr-related data (like
+`required_columns`) MUST store column names (strings), not `Expr` instances.
+A separate `.equals(other)` method returns `bool` for structural Expr comparison.
 
 **`|` operator disambiguation**: `Expr.__or__` is used for boolean OR between
 expressions (`(age < 18) | (age > 65)`). `Transducer.__or__` is used for

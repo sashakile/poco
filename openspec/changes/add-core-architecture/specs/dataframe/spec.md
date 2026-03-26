@@ -65,6 +65,21 @@ has an uncollected plan.
 - **THEN** `len(df)` SHALL return the number of rows
 - **AND** `df.columns` SHALL return the list of column names
 
+#### Scenario: df.columns reflects schema after plan transforms
+
+- **WHEN** `df2 = df | po.select(Person.name)` and `df2.columns` is accessed
+- **THEN** `df2.columns` SHALL return `["name"]` (reflecting the schema after
+  applying the plan's schema transforms)
+- **AND** this SHALL NOT trigger materialization — the column list is computed
+  from the schema transform chain, not from data
+
+#### Scenario: df.schema reflects schema after plan transforms
+
+- **WHEN** `df2 = df | po.select(Person.name)` and `df2.schema` is accessed
+- **THEN** `df2.schema` SHALL reflect only the `name` column
+- **AND** `df2.schema.name` SHALL return a `ColumnRef` expression
+- **AND** this SHALL NOT trigger materialization
+
 ### Requirement: DataFrame display
 
 `DataFrame.__repr__` SHALL display the data as a formatted table with column

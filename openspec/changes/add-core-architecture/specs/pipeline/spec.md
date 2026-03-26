@@ -218,6 +218,36 @@ transducer) SHALL be extracted and applied; the schema component is ignored.
 - **WHEN** `po.reduce(po.count, df, transducer=po.filtering(lambda r: r["age"] > 25))`
 - **THEN** the bare transducer SHALL be applied directly to the reducer
 
+### Requirement: PipelineStep SHALL only be constructed through validated factories
+
+`PipelineStep` SHALL NOT expose a public constructor that accepts arbitrary
+`(transducer, schema_transform)` pairs. Pipeline steps SHALL only be created
+through validated factory functions (`where()`, `select()`, `comp()`, and
+cross-layer lifting) that guarantee data-schema coherence — i.e., the data
+transform and schema transform components are always consistent with each other.
+
+#### Scenario: Factory functions are the only public constructors
+
+- **WHEN** a user needs a pipeline step
+- **THEN** they SHALL use `po.where(expr)`, `po.select(*exprs)`, `po.comp(...)`,
+  or the `|` operator on existing steps
+- **AND** direct construction of `PipelineStep(transducer, schema_transform)`
+  SHALL NOT be part of the public API
+
+### Requirement: SchemaTransform SHALL be exhaustively handled
+
+`SchemaTransform` SHALL be a sealed type hierarchy (`Identity`, `Project`, and
+future variants like `Extend`, `Rename`). All code matching on `SchemaTransform`
+variants SHALL handle every variant explicitly. Python implementations SHALL use
+`typing.assert_never()` in the default/else branch to ensure type-checker
+enforcement when new variants are added.
+
+#### Scenario: New variant causes type error in unhandled match
+
+- **WHEN** a new `SchemaTransform` variant is added (e.g., `Extend` or `Rename`)
+- **THEN** any code that matches on `SchemaTransform` variants without handling
+  the new variant SHALL produce a type error detectable by mypy/pyright
+
 ### Requirement: comp composes left-to-right with named parameters
 
 `po.comp(first=xf1, second=xf2)` SHALL compose transducers or pipeline steps
