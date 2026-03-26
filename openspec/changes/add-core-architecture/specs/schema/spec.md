@@ -50,10 +50,10 @@ schema is provided. The inferred schema SHALL be a dynamically created
 - **WHEN** a user creates `po.DataFrame([{"name": "Ana", "age": 30}])`
 - **THEN** `df.schema` SHALL have fields `name: str` and `age: int` with working descriptors
 
-#### Scenario: Mixed-type column raises TypeError
+#### Scenario: Mixed-type column raises SchemaError on inference
 
 - **WHEN** a user creates `po.DataFrame({"val": [1, "two", 3.0]})`
-- **THEN** the system SHALL raise a `TypeError` with a message identifying
+- **THEN** the system SHALL raise a `SchemaError` with a message identifying
   the column `"val"` and the conflicting types found
 - **AND** the error message SHALL suggest declaring an explicit schema
 

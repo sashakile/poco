@@ -39,13 +39,14 @@
 ## 4. Transducer system
 - [ ] 4.1 Write tests for filtering, mapping, taking, dropping transducers
 - [ ] 4.2 Write tests for taking early termination (items after n not processed)
+- [ ] 4.2a Write tests for stateful transducer independence (taking/dropping produce fresh state per wrapping)
 - [ ] 4.3 Write tests for left-to-right composition order with non-commutative transducers
 - [ ] 4.4 Write tests for composition associativity
 - [ ] 4.5 Write tests for identity transducer (neutral element of composition)
 - [ ] 4.6 Write tests for transducer-reducer compatibility laws (init, complete, Reduced propagation)
-- [ ] 4.7 Write tests for cross-layer composition (high-level | low-level)
+- [ ] 4.7 Write tests for cross-layer composition (PipelineStep | Transducer lifts to PipelineStep with Identity schema)
 - [ ] 4.8 Implement `Transducer` protocol with __or__ for left-to-right composition
-- [ ] 4.9 Implement core transducers: `filtering`, `mapping`, `taking`, `dropping`
+- [ ] 4.9 Implement core transducers: `filtering`, `mapping`, `taking`, `dropping` (closure state for stateful ones)
 - [ ] 4.10 Implement identity transducer and `comp(first=, second=)`
 - [ ] 4.11 Hypothesis PBT: composition associativity, identity laws (with non-commutative xfs)
 
@@ -53,11 +54,13 @@
 - [ ] 5.1 Write tests for SchemaTransform: Identity, Project
 - [ ] 5.2 Write tests for SchemaTransform composition
 - [ ] 5.3 Write tests for PipelineStep component-wise composition
+- [ ] 5.3a Write tests for step-step schema validation (select then where on missing column → SchemaError)
+- [ ] 5.3b Write tests for step-step composition bypasses validation when low-level steps involved
 - [ ] 5.4 Write tests for where(expr) → PipelineStep (data=filtering, schema=Identity)
 - [ ] 5.5 Write tests for select(*exprs) → PipelineStep (data=column_dropper, schema=Project)
 - [ ] 5.6 Write tests for required_columns on Expr-based pipeline steps
-- [ ] 5.7 Implement `SchemaTransform` (Identity, Project, Extend, Rename)
-- [ ] 5.8 Implement `PipelineStep` with component-wise __or__ composition
+- [ ] 5.7 Implement `SchemaTransform` (Identity, Project)
+- [ ] 5.8 Implement `PipelineStep` with component-wise __or__ composition and schema validation
 - [ ] 5.9 Implement `where(expr)` → PipelineStep
 - [ ] 5.10 Implement `select(*exprs)` → PipelineStep
 
@@ -74,7 +77,7 @@
 - [ ] 6.10 Write tests for schema mismatch on pipe → SchemaError (Expr-based steps only)
 - [ ] 6.11 Write tests for low-level transducers bypassing schema check
 - [ ] 6.12 Write tests for PipelineStep.__call__(df) convenience
-- [ ] 6.13 Write tests for po.reduce(reducer, df) forces collection
+- [ ] 6.13 Write tests for po.reduce(reducer, df) forces collection (accepts PipelineStep or Transducer)
 - [ ] 6.14 Write tests for DataFrame.__repr__ (small: all rows, large: first 5 + last 5)
 - [ ] 6.15 Write tests for DataFrame._repr_html_ for Jupyter
 - [ ] 6.16 Implement lazy `DataFrame` with plan, columnar storage, and caching

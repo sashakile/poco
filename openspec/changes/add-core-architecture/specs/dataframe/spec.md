@@ -88,7 +88,7 @@ represented as a one-column DataFrame.
 #### Scenario: Single column is a DataFrame
 
 - **WHEN** a user selects a single column from a DataFrame
-- **THEN** the result SHALL be a `DataFrame` (or `LazyFrame`), not a `Series`
+- **THEN** the result SHALL be a `DataFrame`, not a `Series`
 
 ### Requirement: Helpful error messages
 
@@ -105,6 +105,6 @@ All errors raised by the DataFrame system SHALL include:
 
 #### Scenario: Type error includes context
 
-- **WHEN** a `TypeError` is raised due to mixed types in a column
+- **WHEN** a `SchemaError` is raised due to mixed types in a column
 - **THEN** the message SHALL name the column, list the types found, and
   suggest declaring an explicit schema

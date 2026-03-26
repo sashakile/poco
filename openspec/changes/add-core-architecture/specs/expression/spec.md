@@ -47,7 +47,8 @@ overloading, not via strings or lambdas.
 `Expr.__eq__` SHALL return a `BinOp(EQ, ...)` expression (not `bool`), enabling
 `Person.age == 30` as a query expression. To preserve Python dict/set behavior,
 `Expr.__hash__` SHALL be implemented based on column name and dtype (for
-`ColumnRef`) or structural identity (for compound expressions).
+`ColumnRef`), wrapped value (for `Literal`), or structural identity (for
+compound expressions).
 
 A separate `.equals(other)` method SHALL be provided for actual equality
 comparison between Expr objects (returns `bool`).
@@ -63,6 +64,12 @@ comparison between Expr objects (returns `bool`).
 - **WHEN** a user uses `Person.age` as a dict key or in a set
 - **THEN** it SHALL work correctly via `__hash__`
 - **AND** two `ColumnRef("age", int)` instances SHALL have the same hash
+
+#### Scenario: Literal is hashable
+
+- **WHEN** a user uses `Literal(30)` in a set or as a dict key
+- **THEN** it SHALL work correctly via `__hash__`
+- **AND** two `Literal(30)` instances SHALL have the same hash
 
 #### Scenario: .equals() for structural comparison
 
@@ -98,6 +105,6 @@ The system SHALL raise clear errors when an expression encounters invalid data.
 
 - **WHEN** `Person.age > 30` is evaluated against `{"name": "Ana", "age": None}`
 - **THEN** the system SHALL raise a `NullValueError` indicating which column
-  contained None and in which row
+  contained None and the expression being evaluated
 - **AND** the error message SHALL suggest filtering nulls with `po.where` or
   declaring the column as nullable in the schema

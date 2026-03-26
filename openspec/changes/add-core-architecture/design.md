@@ -201,11 +201,13 @@ makes each concern explicit:
 - The type checker can track schema evolution through the pipeline
 - Pure schema transforms (rename, reorder) can be optimized to zero data cost
 
-**SchemaTransform operations**:
+**SchemaTransform operations** (this change):
 - `Identity` — no schema change
 - `Project(columns)` — keep only named columns
-- `Extend(name, dtype)` — add a column (for future `derive`)
-- `Rename(mapping)` — rename columns (future)
+
+**SchemaTransform operations** (deferred to future changes):
+- `Extend(name, dtype)` — add a column (for `derive`)
+- `Rename(mapping)` — rename columns
 
 ### API layering: low-level and high-level
 

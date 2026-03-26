@@ -90,17 +90,19 @@ schema transforms compose via function composition. Both are left-to-right.
 - **THEN** it SHALL be equivalent to `df | po.where(Person.age > 25)`
   (returns a lazy DataFrame, does NOT force collection)
 
-### Requirement: head as take + display
+### Requirement: head as take shorthand
 
-`DataFrame.head(n)` SHALL create a new DataFrame with a `taking(n)` step
-appended, then trigger display. The original DataFrame SHALL NOT be modified.
-Early termination SHALL be supported via the `Reduced` protocol.
+`DataFrame.head(n)` SHALL return a new DataFrame with a `taking(n)` step
+appended. The original DataFrame SHALL NOT be modified. The returned DataFrame
+is lazy like any other — display happens when the REPL calls `repr` on the
+return value. Early termination SHALL be supported via the `Reduced` protocol.
 
-#### Scenario: Head returns n rows without mutating
+#### Scenario: Head returns new DataFrame without mutating original
 
-- **WHEN** `df2 = df | po.where(Person.age > 25)` then `df2.head(5)`
-- **THEN** the display SHALL show at most 5 matching rows
-- **AND** `df2` SHALL still be usable without the take(5) in its plan
+- **WHEN** `df2 = df | po.where(Person.age > 25)` then `df3 = df2.head(5)`
+- **THEN** `df3` SHALL be a new lazy DataFrame with `taking(5)` in its plan
+- **AND** `df2` SHALL still be usable without the `taking(5)` in its plan
+- **AND** `repr(df3)` SHALL show at most 5 matching rows
 
 ### Requirement: Schema mismatch on pipe raises early error
 
@@ -123,6 +125,34 @@ pipeline steps (see `transducer/spec.md`). Low-level transducers without
 
 - **WHEN** `po.filtering(lambda row: row["x"] > 0)` is applied via `df | xf`
 - **THEN** no `SchemaError` SHALL be raised at pipe time
+
+### Requirement: Step composition SHALL validate schema compatibility
+
+The system SHALL validate schema compatibility when two pipeline steps with
+known schema transforms are composed via `|`. If the output schema of the
+first step does not satisfy the `required_columns` of the second step, the
+system SHALL raise a `SchemaError` at composition time.
+
+Steps without `required_columns` (low-level transducers lifted to pipeline
+steps) SHALL bypass this validation.
+
+#### Scenario: select then where on missing column raises on composition
+
+- **WHEN** `po.select(Person.name) | po.where(Person.age > 25)` is composed
+- **THEN** the system SHALL raise a `SchemaError` at composition time
+- **AND** the error message SHALL indicate that column `age` is not available
+  after the `select` step
+
+#### Scenario: where then select composes successfully
+
+- **WHEN** `po.where(Person.age > 25) | po.select(Person.name)` is composed
+- **THEN** composition SHALL succeed (where has Identity schema, so all
+  columns remain available for select)
+
+#### Scenario: Low-level steps bypass composition validation
+
+- **WHEN** `po.filtering(lambda r: r["x"] > 0) | po.where(Person.age > 25)` is composed
+- **THEN** no `SchemaError` SHALL be raised (the filtering step has no schema info)
 
 ### Requirement: where builds filtering pipeline step from Expr
 
@@ -154,7 +184,9 @@ The result schema SHALL be auto-generated with only the selected columns.
 
 `po.reduce(reducer, df)` SHALL apply a reducer to a DataFrame's rows and
 return the final result. This forces collection and returns a scalar value.
-An optional `transducer` parameter applies a transducer to the reducer first.
+An optional `transducer` parameter accepts either a `Transducer` or a
+`PipelineStep`. When a `PipelineStep` is passed, its data component (the
+transducer) SHALL be extracted and applied; the schema component is ignored.
 
 #### Scenario: Reduce DataFrame with sum
 
@@ -162,11 +194,17 @@ An optional `transducer` parameter applies a transducer to the reducer first.
   with values `[30, 25, 40]`
 - **THEN** the result SHALL be `95`
 
-#### Scenario: Reduce with transducer
+#### Scenario: Reduce with PipelineStep as transducer
 
 - **WHEN** `po.reduce(po.count, df, transducer=po.where(Person.age > 25))` is called
   where `df` has ages `[30, 20, 40]`
-- **THEN** the transducer SHALL filter to ages `[30, 40]` and the count SHALL be `2`
+- **THEN** the data component of `po.where(...)` SHALL be extracted
+- **AND** the transducer SHALL filter to ages `[30, 40]` and the count SHALL be `2`
+
+#### Scenario: Reduce with bare transducer
+
+- **WHEN** `po.reduce(po.count, df, transducer=po.filtering(lambda r: r["age"] > 25))`
+- **THEN** the bare transducer SHALL be applied directly to the reducer
 
 ### Requirement: comp composes left-to-right with named parameters
 

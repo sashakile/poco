@@ -121,8 +121,10 @@ Internally, left-to-right data flow requires right-to-left function composition:
 
 - **WHEN** a high-level pipeline step (`po.where(Person.age > 25)`) is composed
   with a low-level transducer (`po.mapping(some_fn)`) via `|`
-- **THEN** the composition SHALL produce a valid pipeline step, because both
-  implement compatible composition protocols
+- **THEN** the bare transducer SHALL be lifted into a pipeline step with
+  `Identity` schema transform
+- **AND** the composition SHALL produce a valid pipeline step with component-wise
+  composition of both data and schema parts
 
 ### Requirement: Identity transducer
 
@@ -158,6 +160,45 @@ plain Python callables. These are the low-level building blocks:
 
 - **WHEN** `dropping(2)` is applied to `[1, 2, 3, 4, 5]`
 - **THEN** the result SHALL be `[3, 4, 5]`
+
+### Requirement: Built-in reducers
+
+The system SHALL provide the following built-in reducers implementing the
+three-arity protocol:
+- `to_list` — accumulates items into a list; `complete` returns the list
+- `count` — counts items; `complete(init())` returns `0`
+- `sum_reducer` — sums numeric items; `complete(init())` returns `0`
+- `mean` — computes arithmetic mean; `init` returns `(0, 0)`, `complete`
+  divides sum by count; `complete(init())` SHALL raise `ZeroDivisionError`
+  or return `float('nan')` (implementation may choose)
+
+#### Scenario: to_list collects all items
+
+- **WHEN** `po.reduce(po.to_list, [1, 2, 3])` is called
+- **THEN** the result SHALL be `[1, 2, 3]`
+
+#### Scenario: count on empty input
+
+- **WHEN** `po.reduce(po.count, [])` is called
+- **THEN** the result SHALL be `0`
+
+#### Scenario: mean computes average
+
+- **WHEN** `po.reduce(po.mean, [10, 20, 30])` is called
+- **THEN** the result SHALL be `20.0`
+
+### Requirement: Stateful transducers SHALL produce fresh closure state per wrapping
+
+Stateful transducers (e.g., `taking(n)`, `dropping(n)`) SHALL manage mutable
+state in closure variables captured when the transducer wraps a reducer.
+Each call to the transducer (i.e., each wrapping of a new reducer) SHALL
+produce fresh, independent state.
+
+#### Scenario: taking produces independent state per wrapping
+
+- **WHEN** `taking(2)` wraps `to_list` twice (two separate calls)
+- **THEN** each wrapped reducer SHALL independently track its own count
+- **AND** both SHALL take exactly 2 items from their respective inputs
 
 ### Requirement: High-level pipeline step constructors (Expr-based)
 
