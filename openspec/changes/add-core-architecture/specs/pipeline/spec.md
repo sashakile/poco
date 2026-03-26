@@ -25,11 +25,14 @@ SHALL be processed until materialization is triggered.
 - **AND** `df2` SHALL have only the filter
 - **AND** `df3` SHALL have both filter and select
 
-### Requirement: DataFrame SHALL be immutable and always lazy
+### Requirement: DataFrame API SHALL be immutable and always lazy
 
-DataFrame SHALL be an immutable value object. Operations via `|` return new
+The user-facing `DataFrame` API SHALL be an immutable value object. Operations via `|` return new
 DataFrames with extended plans — the original is never modified. A DataFrame
-SHALL never mutate its own internal state after construction.
+SHALL never mutate its observable state after construction. However, internal
+engine implementations MAY use mutable structures during the materialization
+phase (e.g., inside a transducer loop) for performance optimization, provided
+this mutation is strictly isolated and not observable to the user.
 
 Materialization (executing the plan) SHALL be triggered by:
 - `repr(df)` / `_repr_html_(df)` — display

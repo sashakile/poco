@@ -90,15 +90,22 @@
 - [ ] 6.22 Implement po.reduce(reducer, df, transducer=)
 - [ ] 6.23 Remove `Series` class
 
-## 7. Schema validation and typing
-- [ ] 7.1 Write tests for DataFrame[Schema] generic typing
-- [ ] 7.2 Write tests for auto-generated schema on select/project via SchemaTransform
-- [ ] 7.3 Implement `DataFrame[Schema]` via __class_getitem__
-- [ ] 7.4 Implement auto-generated schema from SchemaTransform chain
-- [ ] 7.5 Implement optional target schema parameter for typed results
+## 7. Relational Operations (Σ and Π)
+- [ ] 7.1 Write tests for Groupby and Aggregate (lazy evaluation, correctness)
+- [ ] 7.2 Write tests for Join (inner, left, right, outer, schema validation)
+- [ ] 7.3 Implement `GroupedDataFrame` and `groupby`
+- [ ] 7.4 Implement `aggregate` via Reducer partitioning
+- [ ] 7.5 Implement `join` (inner, left, right, outer) with lazy evaluation
 
-## 8. Integration and polish
-- [ ] 8.1 Update `__init__.py` exports (full public API surface per design.md)
-- [ ] 8.2 Update tests for new API (remove old Series/DataFrame tests)
-- [ ] 8.3 Update README examples to use new API
-- [ ] 8.4 Update llm.txt and openspec/project.md
+## 8. Schema validation and typing
+- [ ] 8.1 Write tests for DataFrame[Schema] generic typing
+- [ ] 8.2 Write tests for auto-generated schema on select/project via SchemaTransform
+- [ ] 8.3 Implement `DataFrame[Schema]` via __class_getitem__
+- [ ] 8.4 Implement auto-generated schema from SchemaTransform chain
+- [ ] 8.5 Implement optional target schema parameter for typed results
+
+## 9. Integration and polish
+- [ ] 9.1 Update `__init__.py` exports (full public API surface per design.md)
+- [ ] 9.2 Update tests for new API (remove old Series/DataFrame tests)
+- [ ] 9.3 Update README examples to use new API
+- [ ] 9.4 Update llm.txt and openspec/project.md

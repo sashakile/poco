@@ -176,8 +176,7 @@ three-arity protocol:
 - `count` — counts items; `complete(init())` returns `0`
 - `sum_reducer` — sums numeric items; `complete(init())` returns `0`
 - `mean` — computes arithmetic mean; `init` returns `(0, 0)`, `complete`
-  divides sum by count; `complete(init())` SHALL raise `ZeroDivisionError`
-  or return `float('nan')` (implementation may choose)
+  divides sum by count; `complete(init())` SHALL return `float('nan')` to satisfy the empty input validity law
 
 #### Scenario: to_list collects all items
 

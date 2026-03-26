@@ -42,13 +42,14 @@ overloading, not via strings or lambdas.
 - **WHEN** a user writes `~(Person.age > 30)`
 - **THEN** it SHALL produce a `UnaryOp(NOT, BinOp(GT, ...))` expression
 
-### Requirement: Expr __eq__ returns Expr, with safe hashing
+### Requirement: Expr __eq__ returns Expr, and Expr is explicitly unhashable
 
 `Expr.__eq__` SHALL return a `BinOp(EQ, ...)` expression (not `bool`), enabling
-`Person.age == 30` as a query expression. To preserve Python dict/set behavior,
-`Expr.__hash__` SHALL be implemented based on column name and dtype (for
-`ColumnRef`), wrapped value (for `Literal`), or structural identity (for
-compound expressions).
+`Person.age == 30` as a query expression. Because `__eq__` does not return a
+boolean, `Expr` instances CANNOT be safely used as keys in dictionaries or elements
+in sets. Therefore, `Expr.__hash__` SHALL be explicitly set to `None`.
+Any collections (like `required_columns`) MUST store column names (strings),
+not `Expr` instances.
 
 A separate `.equals(other)` method SHALL be provided for actual equality
 comparison between Expr objects (returns `bool`).
@@ -59,17 +60,10 @@ comparison between Expr objects (returns `bool`).
 - **THEN** the result SHALL be a `BinOp(EQ, ColumnRef("age"), Literal(30))` expression
 - **AND** the result SHALL NOT be a `bool`
 
-#### Scenario: Expr is hashable
+#### Scenario: Expr is unhashable
 
-- **WHEN** a user uses `Person.age` as a dict key or in a set
-- **THEN** it SHALL work correctly via `__hash__`
-- **AND** two `ColumnRef("age", int)` instances SHALL have the same hash
-
-#### Scenario: Literal is hashable
-
-- **WHEN** a user uses `Literal(30)` in a set or as a dict key
-- **THEN** it SHALL work correctly via `__hash__`
-- **AND** two `Literal(30)` instances SHALL have the same hash
+- **WHEN** a user attempts to use `Person.age` as a dict key or in a set
+- **THEN** the system SHALL raise a `TypeError` indicating the object is unhashable
 
 #### Scenario: .equals() for structural comparison
 
