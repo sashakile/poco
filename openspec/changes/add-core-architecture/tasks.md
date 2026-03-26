@@ -17,7 +17,7 @@
 - [ ] 2.1a Write tests for schema subclassing (@po.schema class Employee(Person))
 - [ ] 2.2 Write tests for @po.schema decorator (implies @dataclass, preserves dataclasses.fields())
 - [ ] 2.3 Write tests for schema inference from dict and rows
-- [ ] 2.4 Write tests for mixed-type column → TypeError
+- [ ] 2.4 Write tests for mixed-type column → SchemaError
 - [ ] 2.5 Write tests for schema.to_code() producing valid Python
 - [ ] 2.6 Implement `ColumnDescriptor` with __get__, __set__, __set_name__
 - [ ] 2.7 Implement `@po.schema` decorator
@@ -69,10 +69,11 @@
 - [ ] 6.2 Write tests for empty DataFrame (0 rows, 0 columns, empty-column-no-schema → error)
 - [ ] 6.3 Write tests for strict validation errors (column length, schema mismatch)
 - [ ] 6.4 Write tests for DataFrame.__or__(step) → new DataFrame (endomorphism)
-- [ ] 6.5 Write tests for DataFrame immutability (| does not modify original)
+- [ ] 6.5 Write tests for DataFrame full immutability (| does not modify original, collect returns new DF, no internal mutation)
 - [ ] 6.6 Write tests for lazy evaluation: plan preserved until materialization
-- [ ] 6.7 Write tests for materialization triggers: repr, iter, len, collect()
-- [ ] 6.8 Write tests for collect() caching and cache invalidation on plan extension
+- [ ] 6.7 Write tests for materialization triggers: repr, iter, len, collect() — each re-executes plan, no caching
+- [ ] 6.7a Write tests for collect() returns new DataFrame with empty plan and materialized data
+- [ ] 6.7b Write tests for iter yields independent dict copies (mutating yielded dict doesn't affect DF)
 - [ ] 6.9 Write tests for head(n) non-mutating + early termination
 - [ ] 6.10 Write tests for schema mismatch on pipe → SchemaError (Expr-based steps only)
 - [ ] 6.11 Write tests for low-level transducers bypassing schema check
@@ -80,7 +81,7 @@
 - [ ] 6.13 Write tests for po.reduce(reducer, df) forces collection (accepts PipelineStep or Transducer)
 - [ ] 6.14 Write tests for DataFrame.__repr__ (small: all rows, large: first 5 + last 5)
 - [ ] 6.15 Write tests for DataFrame._repr_html_ for Jupyter
-- [ ] 6.16 Implement lazy `DataFrame` with plan, columnar storage, and caching
+- [ ] 6.16 Implement immutable lazy `DataFrame` with plan and columnar storage (no caching)
 - [ ] 6.17 Implement DataFrame construction from dict and rows with validation
 - [ ] 6.18 Implement DataFrame.__or__(step) returning new DataFrame
 - [ ] 6.19 Implement materialization: collect(), __iter__, __len__, __repr__, _repr_html_

@@ -52,11 +52,12 @@ column name to list of values). The DataFrame SHALL implement `__iter__`
 Both `__iter__` and `__len__` SHALL trigger materialization if the DataFrame
 has an uncollected plan.
 
-#### Scenario: Row iteration yields dicts
+#### Scenario: Row iteration yields independent dict copies
 
 - **WHEN** a user iterates via `for row in df`
-- **THEN** each row SHALL be a dict mapping `{column_name: value}`
+- **THEN** each row SHALL be an independent dict copy mapping `{column_name: value}`
 - **AND** rows SHALL be yielded in insertion order
+- **AND** mutating a yielded dict SHALL NOT affect the DataFrame's internal data
 
 #### Scenario: Column count and row count accessible
 

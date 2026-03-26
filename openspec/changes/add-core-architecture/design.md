@@ -46,10 +46,12 @@ result = filtered | po.select(Person.name)  # plan: [where(age > 25), select(nam
 - `repr(df)` / `_repr_html_(df)` — display in REPL/Jupyter
 - `for row in df` — iteration
 - `len(df)` — row count
-- `df.collect()` — explicit force + cache
+- `df.collect()` — explicit force, returns a new materialized DataFrame
 
-After materialization, the result is cached. The plan is preserved so the
-DataFrame can be extended with more steps (which invalidates the cache).
+DataFrame is a fully immutable value object — no internal caching. Each
+materialization trigger re-executes the plan. `collect()` returns a *new*
+DataFrame with data inline and an empty plan. This preserves referential
+transparency: observation never changes state.
 
 **Why no LazyFrame**: A separate LazyFrame type breaks the pipeline endomorphism.
 `DataFrame | xf → DataFrame` is a clean endomorphism. With LazyFrame, the first
@@ -341,8 +343,16 @@ po.NullValueError   # null in strict operation
   Mitigation: `.equals()` method, `__hash__` consistency, documentation.
 
 - **Implicit collection**: `repr(df)` triggers materialization. Users may not
-  realize display has a cost. Mitigation: first display shows a note
-  "Collecting..." and the plan, making the lazy→eager transition visible.
+  realize display has a cost. Each `repr` re-executes the plan (no caching).
+  Mitigation: display shows the plan steps before the data table, making the
+  lazy→eager transition visible. For expensive pipelines, users call
+  `df2 = df.collect()` once and work with the materialized `df2`.
+
+- **No caching trade-off**: Re-executing the plan on each `repr`/`iter`/`len`
+  is intentional — DataFrame is a true immutable value object with no hidden
+  mutable state. For a teaching library working with small-to-medium data,
+  re-computation cost is negligible. Users who need to avoid re-computation
+  use `collect()` to produce a new materialized DataFrame.
 
 - **Breaking with Clojure comp**: `comp(first=a, second=b)` is left-to-right,
   not mathematical composition. This is intentional for a teaching library but

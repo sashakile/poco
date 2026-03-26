@@ -25,51 +25,60 @@ SHALL be processed until materialization is triggered.
 - **AND** `df2` SHALL have only the filter
 - **AND** `df3` SHALL have both filter and select
 
-### Requirement: DataFrame is always lazy
+### Requirement: DataFrame SHALL be immutable and always lazy
 
-DataFrame SHALL be lazy by default. Operations via `|` extend the plan without
-executing it. Materialization (executing the plan) SHALL be triggered by:
+DataFrame SHALL be an immutable value object. Operations via `|` return new
+DataFrames with extended plans — the original is never modified. A DataFrame
+SHALL never mutate its own internal state after construction.
+
+Materialization (executing the plan) SHALL be triggered by:
 - `repr(df)` / `_repr_html_(df)` — display
 - `for row in df` — iteration via `__iter__`
 - `len(df)` — row count via `__len__`
-- `df.collect()` — explicit force
+- `df.collect()` — explicit force, returns a new materialized DataFrame
 
-After materialization, the result SHALL be cached. Extending the plan with
-another `|` step SHALL invalidate the cache.
+Each materialization trigger SHALL execute the plan fresh. No internal cache
+SHALL be maintained on the DataFrame instance.
 
 #### Scenario: Display triggers collection
 
 - **WHEN** `repr(df)` is called on a DataFrame with a non-empty plan
 - **THEN** the plan SHALL be executed and the result displayed as a table
+- **AND** the DataFrame instance SHALL NOT be mutated
 
 #### Scenario: Iteration triggers collection
 
 - **WHEN** `for row in df` is used on a DataFrame with a non-empty plan
 - **THEN** the plan SHALL be executed and rows yielded as dicts
+- **AND** the DataFrame instance SHALL NOT be mutated
 
-#### Scenario: Collect caches results
+#### Scenario: Collect returns new materialized DataFrame
 
-- **WHEN** `df.collect()` is called, then `repr(df)` is called
-- **THEN** `collect()` SHALL execute the plan and cache the result
-- **AND** `repr(df)` SHALL use the cached result (no re-execution)
+- **WHEN** `df2 = df.collect()` is called
+- **THEN** `df2` SHALL be a new DataFrame with the plan executed and data materialized
+- **AND** `df2` SHALL have an empty plan (data is inline)
+- **AND** the original `df` SHALL be unchanged (plan still present)
 
-#### Scenario: Extending plan invalidates cache
+#### Scenario: Repeated materialization re-executes plan
 
-- **WHEN** `df.collect()` is called, then `df2 = df | po.where(Person.age > 25)`
-- **THEN** `df2` SHALL NOT use df's cached result for its own collection
-  (df2 has a different plan)
+- **WHEN** `repr(df)` is called twice on the same uncollected DataFrame
+- **THEN** the plan SHALL be executed both times (no internal caching)
 
-### Requirement: DataFrame display shows plan when uncollected
+### Requirement: DataFrame display SHALL show plan and data
 
-When a DataFrame has not yet been collected, `repr(df)` SHALL first display
-the plan and schema, then trigger collection and display the result table.
-This makes the lazy-to-eager transition visible to the user.
+`repr(df)` SHALL display the plan steps, schema, and the materialized data
+table. This makes the pipeline visible to the user.
 
-#### Scenario: Uncollected DataFrame shows plan then data
+#### Scenario: DataFrame with plan shows plan then data
 
-- **WHEN** `repr(df)` is called on an uncollected DataFrame with plan `[where(age > 25)]`
+- **WHEN** `repr(df)` is called on a DataFrame with plan `[where(age > 25)]`
 - **THEN** the output SHALL include the plan steps and schema
 - **AND** the output SHALL include the materialized data table
+
+#### Scenario: Collected DataFrame shows data only
+
+- **WHEN** `repr(df2)` is called on a DataFrame returned by `collect()` (empty plan)
+- **THEN** the output SHALL show the data table without plan steps
 
 ### Requirement: Pipeline step composition
 

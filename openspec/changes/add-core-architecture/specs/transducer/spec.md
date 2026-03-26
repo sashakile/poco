@@ -17,6 +17,13 @@ The system SHALL define a `Reducer` protocol with three methods:
 - **WHEN** `po.reduce(reducer, collection)` is called
 - **THEN** it SHALL call `init()`, then `step()` for each item, then `complete()`
 
+#### Scenario: Reduce with transducer re-wraps on each call
+
+- **WHEN** `po.reduce(reducer, collection, transducer=xf)` is called
+- **THEN** `reduce` SHALL call `xf(reducer)` to produce a fresh wrapped reducer
+- **AND** the wrapped reducer SHALL be used only for this single reduce call
+  (no reuse of prior wrapped state)
+
 ### Requirement: Reducer laws
 
 Reducers SHALL satisfy the following laws, verified via property-based testing:
