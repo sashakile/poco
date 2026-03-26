@@ -32,7 +32,7 @@ needed for data operations, grounded in category theory.
 ## Usage
 
 ```python
-import poxo as po
+from poco import po
 
 df = po.DataFrame({"name": ["Ana", "Luis"], "age": [30, 25]})
 result = df | po.where(_.age > 25) | po.select(_.name)

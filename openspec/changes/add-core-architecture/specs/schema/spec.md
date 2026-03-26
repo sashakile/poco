@@ -135,7 +135,7 @@ definition that, when executed, produces an equivalent schema.
 #### Scenario: Generated code includes import
 
 - **WHEN** `to_code()` is called
-- **THEN** the output SHALL include `import poxo as po` and the `@po.schema` decorator
+- **THEN** the output SHALL include `from poco import po` and the `@po.schema` decorator
 
 #### Scenario: Schema subclassing
 

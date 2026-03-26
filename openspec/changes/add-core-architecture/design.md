@@ -279,15 +279,16 @@ This forces collection and returns a scalar result (sum, count, mean).
 
 ## Module Structure
 
-All public API SHALL be importable from the top-level `poxo` package via
-`__init__.py`. Internal implementation uses submodules with leading underscore:
-- `poxo/_expr.py` — Expr, ColumnRef, Literal, BinOp, UnaryOp
-- `poxo/_schema.py` — schema decorator, ColumnDescriptor, inference
-- `poxo/_reduce.py` — Reducer protocol, Reduced, reduce(), built-in reducers
-- `poxo/_transducer.py` — Transducer protocol, filtering, mapping, taking, dropping, comp
-- `poxo/_pipeline.py` — PipelineStep, SchemaTransform, where, select
-- `poxo/_dataframe.py` — DataFrame
-- `poxo/_errors.py` — SchemaError, ColumnNotFoundError, NullValueError
+All public API SHALL be importable via `from poco import po`. Internal
+implementation uses submodules with leading underscore, re-exported through
+`poco/po.py`:
+- `poco/_expr.py` — Expr, ColumnRef, Literal, BinOp, UnaryOp
+- `poco/_schema.py` — schema decorator, ColumnDescriptor, inference
+- `poco/_reduce.py` — Reducer protocol, Reduced, reduce(), built-in reducers
+- `poco/_transducer.py` — Transducer protocol, filtering, mapping, taking, dropping, comp
+- `poco/_pipeline.py` — PipelineStep, SchemaTransform, where, select
+- `poco/_dataframe.py` — DataFrame
+- `poco/_errors.py` — SchemaError, ColumnNotFoundError, NullValueError
 
 ### DataFrame[Schema] generics
 
@@ -298,7 +299,7 @@ is for type checker hints only.
 ## Public API Surface
 
 ```python
-import poxo as po
+from poco import po
 
 # Schema
 po.schema          # decorator (implies @dataclass)

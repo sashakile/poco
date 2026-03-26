@@ -23,5 +23,5 @@ single always-lazy DataFrame type.
 ## Impact
 
 - Affected specs: schema, expression, transducer, dataframe, pipeline (all new)
-- Affected code: `poxo/` (full rewrite of stubs)
+- Affected code: `poco/` (full rewrite of stubs)
 - **BREAKING**: Removes `Series` class. Removes empty-constructor `DataFrame`.

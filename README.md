@@ -26,8 +26,7 @@ teoría de categorías.
 ### Ejemplo
 
 ```python
-import poxo as po
-from poxo import _
+from poco import po
 
 df = po.DataFrame({"nombre": ["Ana", "Luis"], "edad": [30, 25]})
 resultado = df | po.where(_.edad > 25) | po.select(_.nombre)
@@ -51,8 +50,7 @@ interfaces needed for data operations, grounded in category theory.
 ### Example
 
 ```python
-import poxo as po
-from poxo import _
+from poco import po
 
 df = po.DataFrame({"name": ["Ana", "Luis"], "age": [30, 25]})
 result = df | po.where(_.age > 25) | po.select(_.name)
