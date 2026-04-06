@@ -1,6 +1,6 @@
 ## ADDED Requirements
 
-### Requirement: Three-arity reducer protocol
+### Requirement: Three-phase reducer protocol
 
 The system SHALL define a `Reducer` protocol with three methods:
 - `init() -> Acc` — produce initial accumulator
@@ -29,7 +29,10 @@ The system SHALL define a `Reducer` protocol with three methods:
 Reducers SHALL satisfy the following laws, verified via property-based testing:
 
 1. **Determinism**: `step(s, a)` SHALL always return the same result for same `s` and `a`
-2. **Empty input validity**: `complete(init())` SHALL return a valid, well-defined result
+2. **Empty input validity**: `complete(init())` SHALL return a valid, well-defined
+   result for total reducers (count, sum, mean, to_list). Partial reducers
+   (min_reducer, max_reducer) MAY raise `ValueError` on empty input when no
+   identity element exists.
 3. **Resumability**: reducing `xs ++ ys` SHALL equal resuming the fold of `ys`
    from the accumulated state after `xs` (when no `Reduced` is returned)
 4. **Reduced validity**: if `step` returns `Reduced(s)`, `complete(s)` SHALL be valid
@@ -131,15 +134,6 @@ Internally, left-to-right data flow requires right-to-left function composition:
 - **WHEN** transducers `a`, `b`, `c` are composed as `(a | b) | c` and `a | (b | c)`
 - **THEN** both SHALL produce identical results for any input
 
-#### Scenario: Cross-layer composition
-
-- **WHEN** a high-level pipeline step (`po.where(Person.age > 25)`) is composed
-  with a low-level transducer (`po.mapping(some_fn)`) via `|`
-- **THEN** the bare transducer SHALL be lifted into a pipeline step with
-  `Identity` schema transform
-- **AND** the composition SHALL produce a valid pipeline step with component-wise
-  composition of both data and schema parts
-
 ### Requirement: Identity transducer
 
 The system SHALL provide an identity transducer that passes through the
@@ -195,15 +189,31 @@ plain Python callables. These are the low-level building blocks:
 - **WHEN** `dropping(-1)` is called
 - **THEN** the system SHALL raise a `ValueError`
 
+#### Scenario: Dropping more than input length
+
+- **WHEN** `dropping(100)` is applied to `[1, 2, 3]`
+- **THEN** the result SHALL be `[]`
+
+#### Scenario: Composed stateful transducers
+
+- **WHEN** `taking(3) | taking(5)` is applied to `[1, 2, 3, 4, 5]`
+- **THEN** the result SHALL be `[1, 2, 3]` (taking(3) emits 3 items,
+  taking(5) passes all 3 through)
+
 ### Requirement: Built-in reducers
 
 The system SHALL provide the following built-in reducers implementing the
-three-arity protocol:
+three-phase protocol:
 - `to_list` — accumulates items into a list; `complete` returns the list
 - `count` — counts items; `complete(init())` returns `0`
 - `sum_reducer` — sums numeric items; `complete(init())` returns `0`
+- `min_reducer` — tracks minimum value; `complete(init())` SHALL raise
+  `ValueError` (partial reducer: no minimum of empty sequence)
+- `max_reducer` — tracks maximum value; `complete(init())` SHALL raise
+  `ValueError` (partial reducer: no maximum of empty sequence)
 - `mean` — computes arithmetic mean; `init` returns `(0, 0)`, `complete`
-  divides sum by count; `complete(init())` SHALL return `float('nan')` to satisfy the empty input validity law
+  divides sum by count; `complete(init())` SHALL return `float('nan')`
+  (0/0 is mathematically undefined; NaN satisfies the empty input law)
 
 #### Scenario: to_list collects all items
 
@@ -220,6 +230,26 @@ three-arity protocol:
 - **WHEN** `po.reduce(po.mean, [10, 20, 30])` is called
 - **THEN** the result SHALL be `20.0`
 
+#### Scenario: min_reducer finds minimum
+
+- **WHEN** `po.reduce(po.min_reducer, [3, 1, 4, 1, 5])` is called
+- **THEN** the result SHALL be `1`
+
+#### Scenario: max_reducer finds maximum
+
+- **WHEN** `po.reduce(po.max_reducer, [3, 1, 4, 1, 5])` is called
+- **THEN** the result SHALL be `5`
+
+#### Scenario: min_reducer on empty raises error
+
+- **WHEN** `po.reduce(po.min_reducer, [])` is called
+- **THEN** the system SHALL raise a `ValueError`
+
+#### Scenario: max_reducer on empty raises error
+
+- **WHEN** `po.reduce(po.max_reducer, [])` is called
+- **THEN** the system SHALL raise a `ValueError`
+
 ### Requirement: Stateful transducers SHALL produce fresh closure state per wrapping
 
 Stateful transducers (e.g., `taking(n)`, `dropping(n)`) SHALL manage mutable
@@ -233,34 +263,40 @@ produce fresh, independent state.
 - **THEN** each wrapped reducer SHALL independently track its own count
 - **AND** both SHALL take exactly 2 items from their respective inputs
 
-### Requirement: High-level pipeline step constructors (Expr-based)
+### Requirement: Column-bound reducers
 
-The system SHALL provide high-level constructors that accept `Expr` objects
-(see `expression/spec.md`) and produce pipeline steps. These build on the
-low-level transducers and add schema transforms:
+The system SHALL provide column-bound reducer factories that combine a base
+reducer with an `Expr` for column extraction. These create reducers that
+extract a column value from each row (via Expr evaluation) before applying
+the base reducer.
 
-- `where(expr)` — data: filtering transducer evaluating Expr per row; schema: Identity
-- `select(*exprs)` — data: column dropper; schema: Project(selected columns)
+- `sum_of(expr)` — extract column, sum values
+- `mean_of(expr)` — extract column, compute mean
+- `min_of(expr)` — extract column, find minimum
+- `max_of(expr)` — extract column, find maximum
+- `count_of()` — count rows (no column extraction needed)
 
-These are the primary user-facing API. The low-level `filtering`, `mapping`,
-etc. are also public for advanced use and custom transducer construction.
+Column-bound reducers SHALL expose `required_columns` (the set of column
+names referenced by the bound Expr).
 
-Pipeline steps built from `Expr` objects SHALL store `required_columns` (the
-set of column names referenced by the Expr tree). This enables schema
-validation at pipe time (see `pipeline/spec.md`).
+#### Scenario: sum_of extracts and sums
 
-#### Scenario: where wraps filtering with Expr evaluation
+- **WHEN** `po.reduce(po.sum_of(Person.salary), rows)` is called
+  where rows are `[{"name": "Ana", "salary": 50}, {"name": "Luis", "salary": 70}]`
+- **THEN** the result SHALL be `120`
 
-- **WHEN** `po.where(Person.age > 25)` is applied
-- **THEN** it SHALL behave equivalently to `filtering(lambda row: row["age"] > 25)`
-  with schema transform `Identity`
+#### Scenario: mean_of extracts and averages
 
-#### Scenario: where stores required columns
+- **WHEN** `po.reduce(po.mean_of(Person.age), rows)` is called
+  where rows are `[{"name": "Ana", "age": 30}, {"name": "Luis", "age": 20}]`
+- **THEN** the result SHALL be `25.0`
 
-- **WHEN** `po.where(Person.age > 25)` is created
-- **THEN** the pipeline step's `required_columns` SHALL be `{"age"}`
+#### Scenario: count_of counts rows
 
-#### Scenario: select produces project schema transform
+- **WHEN** `po.reduce(po.count_of(), rows)` is called with 3 rows
+- **THEN** the result SHALL be `3`
 
-- **WHEN** `po.select(Person.name, Person.age)` is created
-- **THEN** the schema transform SHALL be `Project(["name", "age"])`
+#### Scenario: Column-bound reducer stores required columns
+
+- **WHEN** `po.sum_of(Person.salary)` is created
+- **THEN** the column-bound reducer SHALL expose `required_columns` as `{"salary"}`

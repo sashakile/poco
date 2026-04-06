@@ -6,6 +6,10 @@
 appended to its plan. The original DataFrame SHALL NOT be modified. No data
 SHALL be processed until materialization is triggered.
 
+`DataFrame.__or__` SHALL accept a `PipelineStep`. If a bare `Transducer` is
+provided, it SHALL be auto-lifted to a `PipelineStep` with `Identity` schema
+transform. If the operand is neither, a `TypeError` SHALL be raised.
+
 #### Scenario: Pipe creates new DataFrame with extended plan
 
 - **WHEN** `df | po.where(Person.age > 25)`
@@ -24,6 +28,18 @@ SHALL be processed until materialization is triggered.
 - **THEN** `df` SHALL have no steps in its plan
 - **AND** `df2` SHALL have only the filter
 - **AND** `df3` SHALL have both filter and select
+
+#### Scenario: Bare transducer auto-lifts on pipe
+
+- **WHEN** `df | po.filtering(lambda row: row["age"] > 25)`
+- **THEN** the bare transducer SHALL be lifted to a `PipelineStep` with
+  `Identity` schema transform
+- **AND** the result SHALL be a new `DataFrame` with the lifted step in its plan
+
+#### Scenario: Invalid operand raises TypeError
+
+- **WHEN** `df | 42` or `df | "hello"`
+- **THEN** the system SHALL raise a `TypeError`
 
 ### Requirement: DataFrame API SHALL be immutable and always lazy
 
@@ -105,7 +121,8 @@ schema transforms compose via function composition. Both are left-to-right.
 ### Requirement: head as take shorthand
 
 `DataFrame.head(n)` SHALL return a new DataFrame with a `taking(n)` step
-appended. The original DataFrame SHALL NOT be modified. The returned DataFrame
+appended, lifted to a `PipelineStep` with `Identity` schema transform.
+The original DataFrame SHALL NOT be modified. The returned DataFrame
 is lazy like any other — display happens when the REPL calls `repr` on the
 return value. Early termination SHALL be supported via the `Reduced` protocol.
 
@@ -116,6 +133,11 @@ return value. Early termination SHALL be supported via the `Reduced` protocol.
 - **AND** `df2` SHALL still be usable without the `taking(5)` in its plan
 - **AND** `repr(df3)` SHALL show at most 5 matching rows
 
+#### Scenario: Head with zero
+
+- **WHEN** `df.head(0)`
+- **THEN** the result SHALL be a DataFrame that materializes to 0 rows
+
 ### Requirement: Schema mismatch on pipe raises early error
 
 The system SHALL raise a `SchemaError` when a pipeline step built from one
@@ -123,8 +145,9 @@ schema is applied via `|` to a DataFrame with an incompatible schema. The
 error SHALL be raised at pipe time (when `|` is evaluated), not at collection.
 
 Schema validation uses the `required_columns` set stored on Expr-based
-pipeline steps (see `transducer/spec.md`). Low-level transducers without
-`required_columns` SHALL bypass schema validation.
+pipeline steps (see `transducer/spec.md`). Low-level transducers lifted to
+pipeline steps have `Identity` schema and no `required_columns`, so they
+bypass schema validation.
 
 #### Scenario: Incompatible schema raises on pipe
 
@@ -145,8 +168,19 @@ known schema transforms are composed via `|`. If the output schema of the
 first step does not satisfy the `required_columns` of the second step, the
 system SHALL raise a `SchemaError` at composition time.
 
-Steps without `required_columns` (low-level transducers lifted to pipeline
-steps) SHALL bypass this validation.
+Validation logic:
+- `Identity` schema output preserves all input columns — any `required_columns`
+  are presumed available (validation passes)
+- `Project(columns)` schema output restricts to named columns — the second
+  step's `required_columns` must be a subset of those columns
+- `Extend(new_columns)` schema output preserves all input columns and adds
+  named columns — any `required_columns` are presumed available (validation
+  passes), and the extended column names are additionally known to be available
+- `GroupBy(keys, aggregations)` schema output restricts to key columns and
+  aggregation result columns — the second step's `required_columns` must be
+  a subset of those columns
+- Steps without `required_columns` (low-level transducers lifted to pipeline
+  steps) bypass this validation entirely
 
 #### Scenario: select then where on missing column raises on composition
 
@@ -164,7 +198,64 @@ steps) SHALL bypass this validation.
 #### Scenario: Low-level steps bypass composition validation
 
 - **WHEN** `po.filtering(lambda r: r["x"] > 0) | po.where(Person.age > 25)` is composed
-- **THEN** no `SchemaError` SHALL be raised (the filtering step has no schema info)
+- **THEN** no `SchemaError` SHALL be raised (the filtering step has Identity
+  schema, which preserves all input columns)
+
+### Requirement: High-level pipeline step constructors (Expr-based)
+
+The system SHALL provide high-level constructors that accept `Expr` objects
+(see `expression/spec.md`) and produce pipeline steps. These build on the
+low-level transducers and add schema transforms:
+
+- `where(expr)` — data: filtering transducer evaluating Expr per row; schema: Identity
+- `select(*exprs)` — data: column dropper; schema: Project(selected columns)
+- `derive(**named_exprs)` — data: row extender evaluating Exprs; schema: Extend(new columns)
+- `sort_by(*exprs, descending=)` — data: materializing sort; schema: Identity
+- `distinct(*exprs)` — data: stateful dedup transducer; schema: Identity
+
+These are the primary user-facing API. The low-level `filtering`, `mapping`,
+etc. are also public for advanced use and custom transducer construction.
+
+Pipeline steps built from `Expr` objects SHALL store `required_columns` (the
+set of column names referenced by the Expr tree). This enables schema
+validation at pipe time.
+
+#### Scenario: where wraps filtering with Expr evaluation
+
+- **WHEN** `po.where(Person.age > 25)` is applied
+- **THEN** it SHALL behave equivalently to `filtering(lambda row: row["age"] > 25)`
+  with schema transform `Identity`
+
+#### Scenario: where stores required columns
+
+- **WHEN** `po.where(Person.age > 25)` is created
+- **THEN** the pipeline step's `required_columns` SHALL be `{"age"}`
+
+#### Scenario: select produces project schema transform
+
+- **WHEN** `po.select(Person.name, Person.age)` is created
+- **THEN** the schema transform SHALL be `Project(["name", "age"])`
+
+#### Scenario: select with no arguments raises error
+
+- **WHEN** `po.select()` is called with no arguments
+- **THEN** the system SHALL raise a `ValueError` indicating that at least
+  one column expression is required
+
+### Requirement: Cross-layer composition
+
+The system SHALL support composing a bare `Transducer` with a `PipelineStep`
+via `|`. When this occurs, the bare transducer SHALL be lifted into a
+pipeline step with `Identity` schema transform, and the composition SHALL
+then proceed component-wise.
+
+#### Scenario: Bare transducer composed with pipeline step
+
+- **WHEN** `po.mapping(some_fn) | po.where(Person.age > 25)` is composed
+- **THEN** the bare transducer SHALL be lifted into a pipeline step with
+  `Identity` schema transform
+- **AND** the composition SHALL produce a valid pipeline step with component-wise
+  composition of both data and schema parts
 
 ### Requirement: where builds filtering pipeline step from Expr
 
@@ -196,13 +287,29 @@ The result schema SHALL be auto-generated with only the selected columns.
 
 `po.reduce(reducer, df)` SHALL apply a reducer to a DataFrame's rows and
 return the final result. This forces collection and returns a scalar value.
-An optional `transducer` parameter accepts either a `Transducer` or a
+An optional `transducer` keyword parameter accepts either a `Transducer` or a
 `PipelineStep`. When a `PipelineStep` is passed, its data component (the
 transducer) SHALL be extracted and applied; the schema component is ignored.
 
-#### Scenario: Reduce DataFrame with sum
+Because DataFrame iteration yields row dicts, reducers passed directly to
+`po.reduce(..., df)` SHALL be compatible with rows. Reducers over scalar
+column values SHALL use a column-bound reducer such as `sum_of(expr)` or
+`mean_of(expr)`.
 
-- **WHEN** `po.reduce(po.sum_reducer, df)` is called where `df` has column `age`
+Only streaming transducers and streaming pipeline steps are valid in the
+`transducer=` parameter. Materializing steps such as `sort_by` and `groupby`
+SHALL raise a `TypeError` when passed to `po.reduce`, because `reduce` only
+knows how to wrap a reducer with row-at-a-time transformations.
+
+#### Scenario: Reduce DataFrame rows with count
+
+- **WHEN** `po.reduce(po.count, df)` is called on a DataFrame with rows
+  `{"age": 30}`, `{"age": 25}`, `{"age": 40}`
+- **THEN** the result SHALL be `3`
+
+#### Scenario: Reduce DataFrame column with column-bound reducer
+
+- **WHEN** `po.reduce(po.sum_of(Person.age), df)` is called where `df` has column `age`
   with values `[30, 25, 40]`
 - **THEN** the result SHALL be `95`
 
@@ -218,29 +325,40 @@ transducer) SHALL be extracted and applied; the schema component is ignored.
 - **WHEN** `po.reduce(po.count, df, transducer=po.filtering(lambda r: r["age"] > 25))`
 - **THEN** the bare transducer SHALL be applied directly to the reducer
 
+#### Scenario: Reduce rejects materializing pipeline steps
+
+- **WHEN** `po.reduce(po.count, df, transducer=po.sort_by(Person.age))` is called
+- **THEN** the system SHALL raise a `TypeError` indicating that materializing
+  pipeline steps cannot be used as reducer wrappers
+
 ### Requirement: PipelineStep SHALL only be constructed through validated factories
 
 `PipelineStep` SHALL NOT expose a public constructor that accepts arbitrary
 `(transducer, schema_transform)` pairs. Pipeline steps SHALL only be created
-through validated factory functions (`where()`, `select()`, `comp()`, and
-cross-layer lifting) that guarantee data-schema coherence — i.e., the data
-transform and schema transform components are always consistent with each other.
+through validated factory functions (`where()`, `select()`, `derive()`,
+`sort_by()`, `distinct()`, `groupby()`, `comp()`, and cross-layer lifting)
+that guarantee data-schema coherence — i.e., the data transform and schema
+transform components are always consistent with each other.
 
 #### Scenario: Factory functions are the only public constructors
 
 - **WHEN** a user needs a pipeline step
-- **THEN** they SHALL use `po.where(expr)`, `po.select(*exprs)`, `po.comp(...)`,
-  or the `|` operator on existing steps
+- **THEN** they SHALL use `po.where(expr)`, `po.select(*exprs)`,
+  `po.derive(**exprs)`, `po.sort_by(*exprs)`, `po.distinct(*exprs)`,
+  `po.groupby(...)`, `po.comp(...)`, or the `|` operator on existing steps
 - **AND** direct construction of `PipelineStep(transducer, schema_transform)`
   SHALL NOT be part of the public API
 
 ### Requirement: SchemaTransform SHALL be exhaustively handled
 
-`SchemaTransform` SHALL be a sealed type hierarchy (`Identity`, `Project`, and
-future variants like `Extend`, `Rename`). All code matching on `SchemaTransform`
-variants SHALL handle every variant explicitly. Python implementations SHALL use
-`typing.assert_never()` in the default/else branch to ensure type-checker
-enforcement when new variants are added.
+`SchemaTransform` SHALL be a sealed type hierarchy (`Identity`, `Project`,
+`GroupBy`, `Extend`; future variants include `Rename`). All code matching on
+`SchemaTransform` variants SHALL handle every variant explicitly. Python
+implementations SHALL use `typing.assert_never()` in the default/else branch
+to ensure type-checker enforcement when new variants are added.
+
+`Extend(new_columns: dict[str, type])` represents adding computed columns.
+It preserves all input columns and adds the named columns with their types.
 
 #### Scenario: New variant causes type error in unhandled match
 
@@ -264,3 +382,206 @@ in left-to-right data flow order: `xf1` is applied first, then `xf2`.
 
 - **WHEN** `po.comp()` is called with no arguments
 - **THEN** it SHALL return an identity pipeline step that passes data and schema unchanged
+
+### Requirement: sort_by orders rows by expression evaluation
+
+`po.sort_by(*exprs, descending=False)` SHALL accept one or more `Expr` objects
+and return a `PipelineStep` that reorders rows by evaluating the key expressions.
+
+The `descending` parameter SHALL accept:
+- `bool` — applies to all sort keys
+- `list[bool]` — one per expression for mixed sort directions; length MUST
+  match the number of expressions
+
+`sort_by` is a **materializing** pipeline step: it requires all input rows
+before producing any output. This is in contrast to streaming steps like
+`where` and `select` whose data components are transducers. The pipeline
+executor SHALL handle this collection boundary transparently.
+
+Schema transform: `Identity` (columns unchanged, only row order changes).
+
+#### Scenario: Sort by single column ascending
+
+- **WHEN** `df | po.sort_by(Person.age)`
+- **THEN** rows SHALL be ordered by `age` in ascending order
+
+#### Scenario: Sort by single column descending
+
+- **WHEN** `df | po.sort_by(Person.age, descending=True)`
+- **THEN** rows SHALL be ordered by `age` in descending order
+
+#### Scenario: Sort by multiple columns
+
+- **WHEN** `df | po.sort_by(Person.dept, Person.age)`
+- **THEN** rows SHALL be ordered by `dept` first (ascending), then by `age`
+  within each `dept` group (ascending)
+
+#### Scenario: Mixed sort directions
+
+- **WHEN** `df | po.sort_by(Person.dept, Person.age, descending=[False, True])`
+- **THEN** rows SHALL be ordered by `dept` ascending, then `age` descending
+  within each `dept` group
+
+#### Scenario: Descending list length mismatch raises error
+
+- **WHEN** `po.sort_by(Person.dept, Person.age, descending=[True])` with 2
+  expressions and 1 bool
+- **THEN** the system SHALL raise a `ValueError` indicating the length mismatch
+
+#### Scenario: Sort is lazy
+
+- **WHEN** `result = df | po.sort_by(Person.age)`
+- **THEN** no computation SHALL occur until materialization is triggered
+
+#### Scenario: Sort composes with streaming steps
+
+- **WHEN** `df | po.where(Person.age > 25) | po.sort_by(Person.age) | po.head(5)`
+- **THEN** the pipeline SHALL filter (streaming), collect and sort (materializing),
+  then take the first 5 (streaming)
+
+#### Scenario: Sort validates columns at pipe time
+
+- **WHEN** `df | po.sort_by(Person.salary)` where `df` has no `salary` column
+- **THEN** the system SHALL raise a `SchemaError` at pipe time
+
+#### Scenario: Stable sort
+
+- **WHEN** rows have equal sort key values
+- **THEN** the relative order of those rows SHALL be preserved (stable sort)
+
+#### Scenario: Sort empty DataFrame
+
+- **WHEN** `df | po.sort_by(Person.age)` where `df` has 0 rows
+- **THEN** the result SHALL be an empty DataFrame with the same schema
+
+#### Scenario: Sort with no expressions raises error
+
+- **WHEN** `po.sort_by()` is called with no arguments
+- **THEN** the system SHALL raise a `ValueError`
+
+#### Scenario: Sort stores required columns
+
+- **WHEN** `po.sort_by(Person.dept, Person.age)` is created
+- **THEN** the pipeline step's `required_columns` SHALL be `{"dept", "age"}`
+
+### Requirement: derive adds computed columns via Expr evaluation
+
+`po.derive(**named_exprs)` SHALL accept one or more keyword arguments where
+each key is the new column name and each value is an `Expr`. It SHALL return
+a `PipelineStep` that appends computed columns to each row.
+
+The data component evaluates each Expr against the current row and adds the
+result as a new column. The schema component is `Extend({name: dtype, ...})`
+where dtype is inferred from the expression's type information.
+
+#### Scenario: Add a single computed column
+
+- **WHEN** `df | po.derive(bonus=Person.salary * 0.1)`
+- **THEN** the result SHALL have all original columns plus a `bonus` column
+- **AND** each row's `bonus` SHALL equal `salary * 0.1`
+
+#### Scenario: Add multiple computed columns
+
+- **WHEN** `df | po.derive(bonus=Person.salary * 0.1, tax=Person.salary * 0.3)`
+- **THEN** the result SHALL have all original columns plus `bonus` and `tax`
+
+#### Scenario: Derive is lazy
+
+- **WHEN** `result = df | po.derive(bonus=Person.salary * 0.1)`
+- **THEN** no computation SHALL occur until materialization is triggered
+
+#### Scenario: Derive schema accessible without materialization
+
+- **WHEN** `df2 = df | po.derive(bonus=Person.salary * 0.1)`
+- **THEN** `df2.columns` SHALL include `"bonus"`
+- **AND** `df2.schema.bonus` SHALL return a `ColumnRef` expression
+- **AND** this SHALL NOT trigger materialization
+
+#### Scenario: Column name conflict raises error
+
+- **WHEN** `df | po.derive(age=Person.age + 1)` where `age` already exists
+- **THEN** the system SHALL raise a `SchemaError` indicating the column name
+  already exists and suggesting using `select` to drop the original first
+
+#### Scenario: Derive with no arguments raises error
+
+- **WHEN** `po.derive()` is called with no keyword arguments
+- **THEN** the system SHALL raise a `ValueError`
+
+#### Scenario: Derive validates source columns at pipe time
+
+- **WHEN** `df | po.derive(bonus=Person.salary * 0.1)` where `df` has no
+  `salary` column
+- **THEN** the system SHALL raise a `SchemaError` at pipe time
+
+#### Scenario: Derive composes with downstream steps
+
+- **WHEN** a pipeline chains derive then filter on the derived column:
+  `df | po.derive(bonus=Person.salary * 0.1) | po.where(S.bonus > 100)`
+  where `S` is the result schema after derive
+- **THEN** the pipeline SHALL compute the bonus column, then filter on it
+
+#### Scenario: Derive stores required columns
+
+- **WHEN** `po.derive(bonus=Person.salary * 0.1)` is created
+- **THEN** the pipeline step's `required_columns` SHALL be `{"salary"}`
+
+### Requirement: distinct removes duplicate rows
+
+`po.distinct(*exprs)` SHALL return a `PipelineStep` that removes duplicate rows.
+
+- With no `Expr` arguments: removes rows where all column values are duplicated.
+- With one or more `Expr` arguments: removes rows where the specified column
+  values are duplicated, keeping the first occurrence of each unique combination.
+
+The data component is a stateful transducer that tracks seen key values and
+only passes through rows whose key has not been seen before. Schema transform:
+`Identity` (all columns preserved; only duplicate rows are removed).
+
+#### Scenario: Distinct all columns
+
+- **WHEN** `df | po.distinct()`
+- **THEN** duplicate rows (where all column values match) SHALL be removed
+- **AND** the first occurrence of each unique row SHALL be preserved
+
+#### Scenario: Distinct on specific columns
+
+- **WHEN** `df | po.distinct(Person.dept)`
+- **THEN** only the first row per unique `dept` value SHALL be preserved
+- **AND** all columns SHALL be present in the result
+
+#### Scenario: Distinct is lazy
+
+- **WHEN** `result = df | po.distinct()`
+- **THEN** no computation SHALL occur until materialization is triggered
+
+#### Scenario: Distinct preserves first-seen order
+
+- **WHEN** `df | po.distinct()` is applied
+- **THEN** rows SHALL appear in the order of their first occurrence
+
+#### Scenario: Distinct on empty DataFrame
+
+- **WHEN** `df | po.distinct()` where `df` has 0 rows
+- **THEN** the result SHALL be an empty DataFrame with the same schema
+
+#### Scenario: Distinct validates columns at pipe time
+
+- **WHEN** `df | po.distinct(Person.salary)` where `df` has no `salary` column
+- **THEN** the system SHALL raise a `SchemaError` at pipe time
+
+#### Scenario: Distinct with nullable columns
+
+- **WHEN** `df | po.distinct(Person.dept)` where some rows have `dept` as `None`
+- **THEN** all `None` values SHALL be treated as equal (one group for `None`)
+
+#### Scenario: Distinct stores required columns
+
+- **WHEN** `po.distinct(Person.dept, Person.city)` is created
+- **THEN** the pipeline step's `required_columns` SHALL be `{"dept", "city"}`
+
+#### Scenario: Distinct with no exprs uses all columns
+
+- **WHEN** `po.distinct()` is applied to a DataFrame with columns `name`, `age`
+- **THEN** rows are compared on all columns — `required_columns` SHALL be empty
+  (schema validation bypassed; all columns are used at collection time)

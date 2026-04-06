@@ -88,6 +88,12 @@ Alternatives considered:
 - `Person.age > 30` → `BinOp(GT, ColumnRef("age"), Literal(30))`
 - `Person.age + 1` → `BinOp(ADD, ColumnRef("age"), Literal(1))`
 
+For joins, the project intentionally narrows the supported predicate language
+to conjunctions of equalities. In `left_expr == right_expr`, the left subtree
+is evaluated against the left row and the right subtree against the right row.
+This avoids inventing a separate two-table expression hierarchy while still
+supporting multi-column joins and self-joins.
+
 `Expr` implements:
 - Comparison: `__gt__`, `__lt__`, `__ge__`, `__le__`, `__eq__`, `__ne__`
 - Arithmetic: `__add__`, `__sub__`, `__mul__`, `__truediv__`
@@ -113,7 +119,7 @@ structure-preserving map from the free algebra to Python values:
 `eval(combine(e1, e2), row) == combine(eval(e1, row), eval(e2, row))`.
 This is verified via PBT.
 
-### Three-arity reducer protocol (Clojure-style)
+### Three-phase reducer protocol (Clojure-style)
 
 A reducer has three phases:
 - `init() -> Acc` — produce initial accumulator
@@ -207,10 +213,28 @@ makes each concern explicit:
 **SchemaTransform operations** (this change):
 - `Identity` — no schema change
 - `Project(columns)` — keep only named columns
+- `GroupBy(keys, aggregations)` — group key columns + aggregation result columns
+- `Extend(new_columns)` — add computed columns (for `derive`)
 
 **SchemaTransform operations** (deferred to future changes):
-- `Extend(name, dtype)` — add a column (for `derive`)
 - `Rename(mapping)` — rename columns
+
+### Materializing pipeline steps
+
+Most pipeline steps are **streaming**: their data component is a transducer that
+processes rows one at a time (`where`, `select`, `distinct`). Some steps are
+**materializing**: they require all input rows before producing output (`sort_by`,
+`groupby`).
+
+A materializing step acts as a collection boundary within the pipeline. The
+pipeline executor collects all rows up to the materializing step, applies the
+transform, and continues with the result. Schema transforms work identically
+for both kinds — the streaming/materializing distinction applies only to the
+data component.
+
+Composition involving materializing steps: when a materializing step is composed
+with any other step via `|`, the result is a materializing step (the boundary
+must be preserved).
 
 ### API layering: low-level and high-level
 
@@ -226,12 +250,18 @@ Two layers of transducer API:
 **High-level** (work with `Expr` objects, user-facing):
 - `where(expr)` — wraps `filtering` with Expr evaluation per row
 - `select(*exprs)` — project operation from column references
+- `derive(**named_exprs)` — add computed columns from Expr evaluation
+- `sort_by(*exprs, descending=)` — reorder rows (materializing step)
+- `distinct(*exprs)` — remove duplicate rows
 
 `where(Person.age > 25)` internally builds a pipeline step:
 `(data=filtering(lambda row: evaluate(expr, row)), schema=Identity)`.
 
 `select(Person.name)` internally builds:
 `(data=column_dropper(["name"]), schema=Project(["name"]))`.
+
+`derive(bonus=Person.salary * 0.1)` internally builds:
+`(data=row_extender({"bonus": expr}), schema=Extend({"bonus": float}))`.
 
 ### Two primitives: reduce + project
 
@@ -275,7 +305,12 @@ schema for type checking.
 
 `po.reduce(reducer, df)` applies a reducer directly to a DataFrame's rows.
 Optional `transducer` parameter applies a transducer to the reducer first.
-This forces collection and returns a scalar result (sum, count, mean).
+This forces collection and returns a scalar result.
+Scalar column reductions on DataFrames use column-bound reducers such as
+`sum_of(Person.age)` because DataFrame iteration yields row dicts, not raw
+column values. The optional `transducer=` hook is restricted to streaming
+wrappers; materializing pipeline steps like `sort_by` are not valid reducer
+wrappers.
 
 ## Module Structure
 
@@ -286,8 +321,9 @@ implementation uses submodules with leading underscore, re-exported through
 - `poco/_schema.py` — schema decorator, ColumnDescriptor, inference
 - `poco/_reduce.py` — Reducer protocol, Reduced, reduce(), built-in reducers
 - `poco/_transducer.py` — Transducer protocol, filtering, mapping, taking, dropping, comp
-- `poco/_pipeline.py` — PipelineStep, SchemaTransform, where, select
+- `poco/_pipeline.py` — PipelineStep, SchemaTransform, where, select, groupby
 - `poco/_dataframe.py` — DataFrame
+- `poco/_join.py` — join operation
 - `poco/_errors.py` — SchemaError, ColumnNotFoundError, NullValueError
 
 ### DataFrame[Schema] generics
@@ -306,10 +342,17 @@ po.schema          # decorator (implies @dataclass)
 
 # DataFrame
 po.DataFrame        # constructor (from dict or rows, optional schema=)
+# methods: .collect(), .head(n), .explain(), .to_dict(), .to_rows()
+# properties: .schema, .columns
 
 # High-level operations (Expr-based, produce PipelineSteps)
 po.where(expr)      # filtering step (schema=identity)
 po.select(*exprs)   # project step (schema=projection)
+po.derive(**exprs)  # add columns step (schema=extend)
+po.sort_by(*exprs, descending=)  # ordering step (materializing, schema=identity)
+po.distinct(*exprs) # dedup step (schema=identity)
+po.groupby(*keys, **aggs)  # group-aggregate step (schema=GroupBy)
+po.join(left, right, on=, how=)  # relational join (returns lazy DataFrame)
 
 # Low-level transducers (callable-based)
 po.filtering(pred)  # filter transducer
@@ -321,12 +364,20 @@ po.comp(first=, second=)  # compose left-to-right (identity if no args)
 # Reduce
 po.reduce(reducer, df, transducer=None)  # apply reducer, forces collection
 
+# Column-bound reducers (for groupby aggregations)
+po.sum_of(expr)     # extract column, sum values
+po.mean_of(expr)    # extract column, compute mean
+po.min_of(expr)     # extract column, find minimum
+po.max_of(expr)     # extract column, find maximum
+po.count_of()       # count rows
+
 # Classes / types (for type hints and isinstance checks)
 po.Expr             # expression base type
+# methods: .equals(other), .is_null(), .fill_null(default)
 po.Reducer          # reducer protocol
 po.Transducer       # transducer protocol
 po.PipelineStep     # (data_transform, schema_transform) pair
-po.SchemaTransform  # schema transformation (Identity, Project, Extend, Rename)
+po.SchemaTransform  # schema transformation (Identity, Project, GroupBy, Extend)
 po.Reduced          # early termination sentinel
 po.SchemaError      # schema validation error
 po.ColumnNotFoundError  # missing column error
@@ -363,5 +414,11 @@ po.NullValueError   # null in strict operation
 
 ## Open Questions
 
-- Derived columns: best syntax TBD (kwargs, `.alias()`, schema inheritance,
-  arrow, or hybrid). Need to prototype and evaluate ergonomics.
+- `sort_by` implementation strategy: materializing steps require a collection
+  boundary within the pipeline executor. Need to decide whether the executor
+  uses an explicit `Materializer` type or handles this via dynamic dispatch on
+  the pipeline step's data component.
+- Derived column type inference: `derive(bonus=Person.salary * 0.1)` needs to
+  infer that `bonus` is `float`. For arithmetic on typed columns this is
+  straightforward, but complex expressions (conditionals, null coalescing) may
+  need explicit type annotation.

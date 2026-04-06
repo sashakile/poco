@@ -2,10 +2,9 @@
 
 ### Requirement: Schema declaration via `@po.schema` decorator
 
-The `@po.schema` decorator SHALL imply `@dataclass` and replace each field
-with a `ColumnDescriptor`. When a field is accessed on the class (not an
-instance), it SHALL return an `Expr` node representing that column. When
-accessed on an instance, it SHALL return the actual value.
+`@po.schema` SHALL imply `@dataclass` and produce a class where accessing a
+field on the class (not an instance) returns an `Expr` node representing that
+column. Accessing a field on an instance returns the actual value.
 
 #### Scenario: Class access returns Expr
 
@@ -34,27 +33,45 @@ accessed on an instance, it SHALL return the actual value.
 - **THEN** it SHALL return correct field metadata (name, type, default)
   matching the original class definition
 
+### Requirement: Runtime schema object
+
+`df.schema` SHALL return the `@po.schema` class itself (for declared schemas)
+or a dynamically created `@po.schema` class (for inferred schemas). In both
+cases, class-level field access SHALL return `Expr` nodes.
+
+#### Scenario: Declared schema accessible
+
+- **WHEN** `df = po.DataFrame({"name": ["Ana"], "age": [30]}, schema=Person)`
+- **THEN** `df.schema` SHALL be the `Person` class
+- **AND** `df.schema.age` SHALL return a `ColumnRef("age", dtype=int)` expression
+
+#### Scenario: Inferred schema accessible
+
+- **WHEN** `df = po.DataFrame({"name": ["Ana"], "age": [30]})`
+- **THEN** `df.schema` SHALL be a dynamically created `@po.schema` class
+- **AND** `df.schema.age` SHALL return a `ColumnRef("age", dtype=int)` expression
+
 ### Requirement: Schema inference from data
 
 The system SHALL infer a schema from dict or row-based data when no explicit
 schema is provided. The inferred schema SHALL be a dynamically created
-`@po.schema` class with `ColumnDescriptor`s.
+`@po.schema` class.
 
 #### Scenario: Infer from dict
 
 - **WHEN** a user creates `po.DataFrame({"name": ["Ana"], "age": [30]})`
-- **THEN** `df.schema` SHALL have fields `name: str` and `age: int` with working descriptors
+- **THEN** `df.schema` SHALL have fields `name: str` and `age: int`
 
 #### Scenario: Infer from rows
 
 - **WHEN** a user creates `po.DataFrame([{"name": "Ana", "age": 30}])`
-- **THEN** `df.schema` SHALL have fields `name: str` and `age: int` with working descriptors
+- **THEN** `df.schema` SHALL have fields `name: str` and `age: int`
 
-#### Scenario: Mixed-type column raises SchemaError on inference
+#### Scenario: Incompatible types raise SchemaError on inference
 
 - **WHEN** a user creates `po.DataFrame({"val": [1, "two", 3.0]})`
 - **THEN** the system SHALL raise a `SchemaError` with a message identifying
-  the column `"val"` and the conflicting types found
+  the column `"val"` and the incompatible types found (`int`, `str`, `float`)
 - **AND** the error message SHALL suggest declaring an explicit schema
 
 #### Scenario: None values infer type from non-None values
@@ -68,6 +85,33 @@ schema is provided. The inferred schema SHALL be a dynamically created
 - **THEN** the system SHALL raise a `SchemaError` because the column type
   cannot be inferred from all-None values
 - **AND** the error message SHALL suggest providing an explicit schema
+
+### Requirement: Numeric type promotion in inference
+
+When a column contains compatible numeric types, the system SHALL promote to
+the widest type in the hierarchy `bool < int < float`. Only truly incompatible
+types (e.g., `str` and `int`) SHALL raise a `SchemaError`.
+
+#### Scenario: int and float promote to float
+
+- **WHEN** a user creates `po.DataFrame({"val": [1, 2.0, 3]})`
+- **THEN** the inferred type SHALL be `float`
+
+#### Scenario: bool and int promote to int
+
+- **WHEN** a user creates `po.DataFrame({"val": [True, 1, 2]})`
+- **THEN** the inferred type SHALL be `int`
+
+#### Scenario: All-bool infers bool
+
+- **WHEN** a user creates `po.DataFrame({"flag": [True, False, True]})`
+- **THEN** the inferred type SHALL be `bool`
+
+#### Scenario: NaN is a valid float, not None
+
+- **WHEN** a user creates `po.DataFrame({"x": [1.0, float('nan'), 3.0]})`
+- **THEN** the inferred type SHALL be `float` (not `Optional[float]`)
+- **AND** `float('nan')` SHALL be treated as a valid `float` value
 
 ### Requirement: Supported column types
 
@@ -88,40 +132,6 @@ the unsupported type and listing supported types.
 - **WHEN** a user declares `@po.schema class Row: age: int | None`
 - **THEN** the schema SHALL accept `age` as `Optional[int]`
 
-### Requirement: Empty DataFrame construction
-
-The system SHALL support constructing DataFrames with zero rows. A DataFrame
-with columns but no rows preserves its schema. A DataFrame with no columns
-and no rows is valid but has an empty schema.
-
-#### Scenario: Empty columns with explicit schema
-
-- **WHEN** `po.DataFrame({"name": [], "age": []}, schema=Person)`
-- **THEN** a DataFrame with 0 rows SHALL be created
-- **AND** `df.schema` SHALL match the `Person` schema
-
-#### Scenario: Empty columns without schema raises error
-
-- **WHEN** `po.DataFrame({"name": [], "age": []})` is called without a schema
-- **THEN** the system SHALL raise a `SchemaError` because types cannot be
-  inferred from empty columns
-- **AND** the error message SHALL suggest providing an explicit schema
-
-#### Scenario: Empty dict, zero columns
-
-- **WHEN** `po.DataFrame({})`
-- **THEN** a DataFrame with 0 columns and 0 rows SHALL be created
-
-#### Scenario: Empty list of rows, zero columns
-
-- **WHEN** `po.DataFrame([])`
-- **THEN** a DataFrame with 0 columns and 0 rows SHALL be created
-
-#### Scenario: Filter removes all rows
-
-- **WHEN** all rows are filtered out by a `where` operation
-- **THEN** the result SHALL be a valid DataFrame with 0 rows and the original schema
-
 ### Requirement: Schema to code bridge
 
 `schema.to_code()` SHALL return a string containing a valid `@po.schema` class
@@ -137,8 +147,28 @@ definition that, when executed, produces an equivalent schema.
 - **WHEN** `to_code()` is called
 - **THEN** the output SHALL include `from poco import po` and the `@po.schema` decorator
 
-#### Scenario: Schema subclassing
+### Requirement: Schema subclassing
+
+The system SHALL support single inheritance for `@po.schema`-decorated
+classes. A `@po.schema`-decorated class MAY inherit from another
+`@po.schema` class, and the subclass SHALL include all fields from the parent
+plus its own fields.
+
+#### Scenario: Subclass inherits parent fields
 
 - **WHEN** a user defines `@po.schema class Employee(Person): salary: float`
 - **THEN** `Employee` SHALL have all fields from `Person` plus `salary`
 - **AND** `Employee.salary` SHALL return a `ColumnRef("salary", dtype=float)` expression
+
+#### Scenario: Subclass field override raises error
+
+- **WHEN** a user defines `@po.schema class Bad(Person): age: str`
+- **THEN** the system SHALL raise a `SchemaError` indicating that field `age`
+  cannot change type from `int` to `str` in a subclass
+
+#### Scenario: Diamond inheritance raises error
+
+- **WHEN** a user defines `@po.schema class Bad(SchemaA, SchemaB): pass`
+  where `SchemaA` and `SchemaB` are `@po.schema` classes with overlapping fields
+- **THEN** the system SHALL raise a `SchemaError` indicating that multiple
+  schema inheritance with overlapping fields is not supported
