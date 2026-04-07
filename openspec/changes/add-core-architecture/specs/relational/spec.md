@@ -9,11 +9,7 @@ The `on` expression SHALL be:
 - a single equality `left_expr == right_expr`, or
 - a conjunction of equalities combined with `&`
 
-**Positional Constraint:** Each equality SHALL be interpreted positionally based on
-lexical order: the left subtree of the `==` operator is evaluated against the
-left input row, and the right subtree is evaluated against the right input row.
-If the order of subtrees does not match the order of DataFrames in the `join()`
-call, the join SHALL fail with a `SchemaError`.
+**Positional Constraint:** Each equality SHALL be interpreted positionally based on the expression tree's structural properties: the `left` operand of the `BinOp(EQ, left, right)` node is evaluated against the left input DataFrame's schema, and the `right` operand is evaluated against the right input DataFrame's schema. If the schema of the `left` operand does not match the left DataFrame, or the schema of the `right` operand does not match the right DataFrame, the join SHALL fail with a `SchemaError`.
 
 **Key Preservation:** In the resulting schema, the name of the column from the
 left-hand side of the equality expression SHALL be preserved as the join key.
@@ -33,8 +29,18 @@ left-hand side of the equality expression SHALL be preserved as the join key.
 
 The system SHALL support `inner`, `left`, `right`, and `outer` joins. The
 `how` parameter SHALL default to `"inner"`. Join conditions involving `None`
-values SHALL follow SQL-like behavior: `None == None` evaluates to `False`
-(or `Unknown`/null) and does not produce a match.
+values SHALL follow explicit SQL-like truth tables, treating `None` as an unknown
+value that cannot equal itself.
+
+**Null Equality Truth Table:**
+- `Value == Value` → `True` (if values are equal)
+- `Value == None`  → `False` (no match)
+- `None == Value`  → `False` (no match)
+- `None == None`   → `False` (no match)
+
+Therefore, rows with `None` in the join key SHALL NOT match each other in an
+inner join, and SHALL be preserved only on their respective sides in outer,
+left, or right joins.
 
 #### Scenario: Left join preserves left rows
 
@@ -124,14 +130,25 @@ objects as group keys and named aggregation reducers. It SHALL return a
 - **WHEN** `result = df | po.groupby(Person.dept, total=po.sum_of(Person.salary))`
 - **THEN** `result` SHALL be a `DataFrame`
 
-### Requirement: Relational validation and composition
+### Requirement: Relational adjunction properties (Σ ⊣ Δ ⊣ Π)
 
-Relational operations SHALL validate referenced columns before materialization
-and SHALL compose with downstream pipeline steps under the same lazy DataFrame
-contract as other operations.
+Relational operations SHALL satisfy the following properties, following Spivak's functorial data migration:
 
-#### Scenario: Groupby missing column raises error at pipe time
+1.  **Δ Pullback (Select/Project/Rename):** Pullback along a schema mapping `f: B → A` SHALL map a DataFrame over schema `A` to a DataFrame over schema `B`. `df | po.select(...)` and `df | po.where(...)` SHALL correspond to this pullback mapping.
+2.  **Σ Left Kan Extension (Groupby/Aggregate):** Grouping and aggregation SHALL correspond to the left adjoint `Σ` of the pullback `Δ`. It SHALL map data over schema `B` to schema `A` by aggregating along the fiber.
+3.  **Π Right Kan Extension (Join/Normalize):** Relational join SHALL correspond to the right adjoint `Π` of the pullback `Δ`. It SHALL preserve the cartesian product of schemas and represent universal properties of the combined state.
 
+#### Scenario: Pullback-Aggregation (Σ ⊣ Δ) Round-trip Property
+- **WHEN** data is migrated via `Δ` (projected) and then aggregated via `Σ` (left Kan extension)
+- **THEN** the round-trip result SHALL satisfy the universal property of the adjunction Σ ⊣ Δ.
+
+#### Scenario: Join-Pullback (Δ ⊣ Π) Round-trip Property
+- **WHEN** two DataFrames are joined via `Π` (right Kan extension) and then projected via `Δ`
+- **THEN** the result SHALL correctly pull back data according to the join predicate mapping.
+
+#### Scenario: Commutative laws for relational operators
+- **WHEN** relational operators are composed (e.g., filter before or after a project)
+- **THEN** the result SHALL follow the functorial laws (structure-preserving maps).
 - **WHEN** `df | po.groupby(Person.department, count=po.count_of())`
 - **THEN** the system SHALL raise a `SchemaError` before collection
 

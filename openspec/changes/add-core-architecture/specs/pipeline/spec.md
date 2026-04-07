@@ -1,13 +1,19 @@
 ## ADDED Requirements
 
-### Requirement: Pipeline step composition
+### Requirement: Pipeline concurrency and parallel execution
 
-`step | step` SHALL return a new composed pipeline step. Composition SHALL
-be component-wise: data transforms compose via transducer composition,
-schema transforms compose via function composition. Both are left-to-right.
+The system SHALL support concurrent evaluation of streaming pipeline steps (transducers).
+- **Thread-Safety Invariant:** Pure transducers (where, select, mapping) SHALL be thread-safe for parallel execution.
+- **Race-Freedom Invariant:** Concurrent evaluation of a streaming pipeline on independent data partitions SHALL produce the same set of rows as sequential evaluation, preserving row order within each partition.
+- **Materialization Boundary:** Materializing steps (sort_by, distinct) SHALL act as synchronization barriers. All rows must be collected and sorted/deduplicated before the next partition can proceed.
 
-#### Scenario: Compose and reuse pipeline
+#### Scenario: Parallel evaluation on partitions
+- **WHEN** a pipeline is executed on multiple threads with partitioned data
+- **THEN** each thread SHALL produce results independent of others, preserving the data transformations of each step.
 
+#### Scenario: Result consistency
+- **WHEN** a pipeline is evaluated concurrently or sequentially
+- **THEN** the set of final materialized rows SHALL be identical (extensional equality).
 - **WHEN** `pipeline = po.where(Person.age > 25) | po.select(Person.name)`
 - **THEN** `pipeline` SHALL be a composed pipeline step
 - **AND** `df1 | pipeline` and `df2 | pipeline` SHALL both produce the expected

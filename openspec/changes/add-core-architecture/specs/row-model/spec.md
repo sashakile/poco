@@ -10,6 +10,8 @@ to values. Keys SHALL be insertion-ordered and correspond to the current schema
 field order. `object` describes the runtime container type only; valid column
 value types remain constrained by `schema/spec.md`.
 
+*Note: This hard requirement for `dict[str, object]` prioritizes API ergonomics and simplicity over raw performance. It creates a performance ceiling for large datasets but is the correct trade-off for the current exploratory and teaching scope. Future iterations may abstract this behind a Row protocol if scaling is required.*
+
 #### Scenario: Row values are keyed by column name
 
 - **WHEN** a materialized row is produced from a DataFrame with columns

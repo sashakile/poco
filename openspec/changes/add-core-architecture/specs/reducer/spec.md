@@ -7,11 +7,22 @@ The system SHALL define a `Reducer` protocol with three methods:
 - `step(acc: Acc, item) -> Acc | Reduced[Acc]`
 - `complete(acc: Acc) -> Result`
 
-When used in a DataFrame context, the `item` passed to `step` SHALL be a
-materialized row matching the shared contract defined in `row-model/spec.md`.
+**Formal Pre/Postconditions:**
+- `init()`:
+  - Pre: None.
+  - Post: Returns a valid initial accumulator `Acc`.
+- `step(acc, item)`:
+  - Pre: `acc` must be a valid `Acc` produced by `init` or a previous `step`. `item` must satisfy the row contract.
+  - Post: Returns a valid `Acc` or a `Reduced[Acc]` signaling early termination.
+- `complete(acc)`:
+  - Pre: `acc` must be a valid `Acc` (unwrapped if from `Reduced`).
+  - Post: Returns the final `Result`.
+
+**Termination Invariant:**
+- The system SHALL guarantee that `complete(acc)` is called exactly once for every reduction, regardless of whether termination occurred via end-of-stream or the `Reduced` protocol. If `step` returns `Reduced(acc)`, the `acc` SHALL be unwrapped and passed immediately to `complete`.
 
 #### Scenario: Reducer with all three phases
-
+...
 - **WHEN** a `mean` reducer is applied to `[10, 20, 30]`
 - **THEN** `init()` SHALL return `(0, 0)` and `complete()` SHALL return `20.0`
 
