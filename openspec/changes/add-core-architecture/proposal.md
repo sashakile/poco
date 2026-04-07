@@ -1,14 +1,15 @@
-# Change: Add core architecture — schema, expressions, transducers, DataFrame, pipeline
+# Change: Add core architecture — row model, schema, expressions, reducers, pipeline, DataFrame, relational ops
 
 ## Why
 
 poxo currently has empty `Series` and `DataFrame` stubs. We need to build the
-foundational architecture before any features: the schema system, expression
-tree, reducer/transducer protocol, pipeline steps as product category, and a
-single always-lazy DataFrame type.
+foundational architecture before any features: a shared row model, schema
+system, expression tree, reducer/transducer protocol, pipeline algebra, a
+single always-lazy DataFrame type, and relational operations.
 
 ## What Changes
 
+- Add shared row contract for expression, reducer, and pipeline evaluation
 - Add `@po.schema` decorator (implies `@dataclass`, field descriptors return `Expr`)
 - Add expression tree (`Expr`) with operator overloading (including reverse ops)
 - Add three-phase reducer protocol (init/step/complete) with formal algebraic laws
@@ -21,12 +22,15 @@ single always-lazy DataFrame type.
 - Add `|` pipe operator for clean endomorphic pipeline composition
 - Materialization triggers: repr, iter, len, collect()
 - Add schema inference with numeric type promotion and `schema.to_code()` bridge
-- Add `groupby` as endomorphism-preserving pipeline step (not a separate type)
-- Add equi-join with column collision handling and lazy evaluation
+- Add relational operations: `groupby` as an endomorphism-preserving pipeline
+  step and `join` as a lazy DataFrame-producing function
+- Separate capability boundaries so the spec graph is a DAG rather than a
+  cycle between DataFrame, pipeline, and expression contracts
 
 ## Impact
 
-- Affected specs: schema, expression, transducer, dataframe, pipeline (all new)
+- Affected specs: row-model, schema, expression, reducer, transducer,
+  aggregation, pipeline, dataframe, relational
 - Affected code: `poco/` (full rewrite of stubs)
 - **BREAKING**: Removes `Series` class. Removes empty-constructor `DataFrame`.
 - No `GroupedDataFrame` type — `groupby` returns a `PipelineStep` to preserve the `DataFrame | step → DataFrame` endomorphism.

@@ -28,6 +28,48 @@ Non-Goals:
 - NumPy backend (future adapter, not in this change)
 - HAMT / persistent data structures (future, pending performance evaluation)
 
+## Capability Boundaries
+
+The proposal is intentionally split into narrowly scoped OpenSpec capabilities
+so the specification dependency graph remains a DAG instead of collapsing into
+a single monolith.
+
+Dependency direction (`A → B` means "B depends on A"):
+
+`row-model → expression → aggregation → relational`
+
+`schema → expression`
+
+`reducer → transducer → pipeline`
+
+`pipeline → dataframe`
+
+`aggregation → relational`
+
+`pipeline → relational`
+
+Boundary rules:
+- `row-model` owns the shape of a materialized row and nothing else
+- `expression` depends on `row-model` and `schema`, but not on `dataframe`
+- `reducer` owns fold laws and built-in reducers, but not schema-aware
+  column extraction
+- `aggregation` owns Expr-bound reducers such as `sum_of(expr)`
+- `pipeline` owns `PipelineStep`, `SchemaTransform`, and pipeline-step
+  factories such as `where`, `select`, `derive`, `sort_by`, and `distinct`
+- `dataframe` owns the `DataFrame` facade: construction, laziness,
+  materialization triggers, exports, and `DataFrame | step`
+- `relational` owns `groupby` and `join`, including result-schema rules
+
+Allowed normative references:
+- `expression` MAY reference `row-model` and `schema`
+- `transducer` MAY reference `reducer`
+- `pipeline` MAY reference `expression`, `transducer`, and `dataframe`
+- `dataframe` MAY reference `pipeline`, `aggregation`, `schema`, and `row-model`
+- `relational` MAY reference `pipeline`, `aggregation`, `expression`, and `dataframe`
+
+This lets each capability change for one reason and reduces co-change across
+the spec set.
+
 ## Decisions
 
 ### Single lazy DataFrame — no LazyFrame

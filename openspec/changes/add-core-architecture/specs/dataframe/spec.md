@@ -82,8 +82,7 @@ and no rows is valid but has an empty schema.
 
 The DataFrame SHALL implement `__iter__` (yielding rows as dicts) and `__len__`
 (returning the number of rows). Both `__iter__` and `__len__` SHALL trigger
-materialization if the DataFrame has an uncollected plan (see `pipeline/spec.md`
-for plan semantics).
+materialization if the DataFrame has an uncollected plan.
 
 #### Scenario: Row iteration yields independent dict copies
 
@@ -117,7 +116,7 @@ for plan semantics).
 
 `DataFrame.__repr__` SHALL display the data as a formatted table with column
 names, types, and values. The default display limit SHALL be 10 rows.
-Display triggers materialization of the full plan (see `pipeline/spec.md`).
+Display triggers materialization of the full plan.
 
 #### Scenario: Small DataFrame display
 
@@ -265,6 +264,89 @@ an uncollected plan.
 - **WHEN** `po.DataFrame(df.to_dict(), schema=df.schema)` is constructed
 - **THEN** the new DataFrame SHALL be equivalent to the original (same data and schema)
 
+### Requirement: Pipe operator extends DataFrame plan
+
+`DataFrame | step` SHALL return a new `DataFrame` with the pipeline step
+appended to its plan. The original DataFrame SHALL NOT be modified. No data
+SHALL be processed until materialization is triggered.
+
+`DataFrame.__or__` SHALL accept a `PipelineStep`. If a bare `Transducer` is
+provided, it SHALL be auto-lifted to a `PipelineStep` with `Identity` schema
+transform. If the operand is neither, a `TypeError` SHALL be raised.
+
+#### Scenario: Pipe creates new DataFrame with extended plan
+
+- **WHEN** `df | po.where(Person.age > 25)`
+- **THEN** the result SHALL be a new `DataFrame` with the filter in its plan
+- **AND** the original `df` SHALL be unchanged
+
+#### Scenario: Bare transducer auto-lifts on pipe
+
+- **WHEN** `df | po.filtering(lambda row: row["age"] > 25)`
+- **THEN** the bare transducer SHALL be lifted to a `PipelineStep` with
+  `Identity` schema transform
+
+#### Scenario: Invalid operand raises TypeError
+
+- **WHEN** `df | 42`
+- **THEN** the system SHALL raise a `TypeError`
+
+### Requirement: DataFrame API SHALL be immutable and always lazy
+
+The user-facing `DataFrame` API SHALL be an immutable value object.
+Operations via `|` return new DataFrames with extended plans. A DataFrame
+SHALL never mutate its observable state after construction.
+
+Materialization SHALL be triggered by:
+- `repr(df)`
+- `df._repr_html_()`
+- `for row in df`
+- `len(df)`
+- `df.collect()`
+
+Each materialization trigger SHALL execute the plan fresh. No internal cache
+SHALL be maintained on the DataFrame instance.
+
+#### Scenario: Collect returns new materialized DataFrame
+
+- **WHEN** `df2 = df.collect()` is called
+- **THEN** `df2` SHALL have materialized data and an empty plan
+- **AND** the original `df` SHALL be unchanged
+
+#### Scenario: Repeated materialization re-executes plan
+
+- **WHEN** `repr(df)` is called twice on the same uncollected DataFrame
+- **THEN** the plan SHALL be executed both times
+
+### Requirement: DataFrame display SHALL show plan and data
+
+`repr(df)` SHALL display plan steps, schema, and the materialized data table.
+
+#### Scenario: DataFrame with plan shows plan then data
+
+- **WHEN** `repr(df)` is called on a DataFrame with a non-empty plan
+- **THEN** the output SHALL include the plan steps and the materialized data table
+
+#### Scenario: Collected DataFrame shows data only
+
+- **WHEN** `repr(df.collect())` is called
+- **THEN** the output SHALL show the data table without plan steps
+
+### Requirement: head as take shorthand
+
+`DataFrame.head(n)` SHALL return a new DataFrame with a `taking(n)` step
+appended, lifted to a `PipelineStep` with `Identity` schema transform.
+
+#### Scenario: Head returns new DataFrame without mutating original
+
+- **WHEN** `df2 = df.head(5)`
+- **THEN** `df2` SHALL be a new lazy DataFrame with `taking(5)` in its plan
+
+#### Scenario: Head with zero
+
+- **WHEN** `df.head(0)`
+- **THEN** the result SHALL materialize to 0 rows
+
 ### Requirement: DataFrame generic typing
 
 `DataFrame` SHALL support `DataFrame[Schema]` syntax for static typing.
@@ -276,6 +358,38 @@ the `DataFrame` class unchanged at runtime.
 - **WHEN** a user writes `po.DataFrame[Person]`
 - **THEN** the result SHALL be the `DataFrame` class object at runtime
 - **AND** the type parameter SHALL exist only for type checkers and annotations
+
+### Requirement: User-facing reduce on DataFrame
+
+`po.reduce(reducer, df)` SHALL apply a reducer to a DataFrame's rows and return
+the final result. This SHALL force collection.
+
+An optional `transducer` keyword parameter accepts either a `Transducer` or a
+`PipelineStep`. If a `PipelineStep` is passed, only its data component SHALL be
+used as the reducer wrapper.
+
+Only streaming transducers and streaming pipeline steps are valid in the
+`transducer=` parameter. Materializing pipeline steps SHALL raise a `TypeError`.
+
+#### Scenario: Reduce DataFrame rows with count
+
+- **WHEN** `po.reduce(po.count, df)` is called on a DataFrame with 3 rows
+- **THEN** the result SHALL be `3`
+
+#### Scenario: Reduce DataFrame column with column-bound reducer
+
+- **WHEN** `po.reduce(po.sum_of(Person.age), df)` is called
+- **THEN** the result SHALL be the sum of the extracted `age` values
+
+#### Scenario: Reduce with PipelineStep as transducer
+
+- **WHEN** `po.reduce(po.count, df, transducer=po.where(Person.age > 25))` is called
+- **THEN** the pipeline step's data transform SHALL wrap the reducer
+
+#### Scenario: Reduce rejects materializing pipeline steps
+
+- **WHEN** `po.reduce(po.count, df, transducer=po.sort_by(Person.age))` is called
+- **THEN** the system SHALL raise a `TypeError`
 
 ### Requirement: Auto-generated schemas after schema-changing steps
 

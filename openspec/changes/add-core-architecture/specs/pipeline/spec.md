@@ -1,104 +1,5 @@
 ## ADDED Requirements
 
-### Requirement: Pipe operator extends DataFrame plan
-
-`DataFrame | step` SHALL return a new `DataFrame` with the pipeline step
-appended to its plan. The original DataFrame SHALL NOT be modified. No data
-SHALL be processed until materialization is triggered.
-
-`DataFrame.__or__` SHALL accept a `PipelineStep`. If a bare `Transducer` is
-provided, it SHALL be auto-lifted to a `PipelineStep` with `Identity` schema
-transform. If the operand is neither, a `TypeError` SHALL be raised.
-
-#### Scenario: Pipe creates new DataFrame with extended plan
-
-- **WHEN** `df | po.where(Person.age > 25)`
-- **THEN** the result SHALL be a new `DataFrame` with the filter in its plan
-- **AND** no rows SHALL have been processed yet
-- **AND** the original `df` SHALL be unchanged
-
-#### Scenario: Chain multiple operations
-
-- **WHEN** `df | po.where(Person.age > 25) | po.select(Person.name)`
-- **THEN** the result SHALL be a `DataFrame` with both filter and project in its plan
-
-#### Scenario: DataFrame is immutable value object
-
-- **WHEN** `df2 = df | po.where(Person.age > 25)` then `df3 = df2 | po.select(Person.name)`
-- **THEN** `df` SHALL have no steps in its plan
-- **AND** `df2` SHALL have only the filter
-- **AND** `df3` SHALL have both filter and select
-
-#### Scenario: Bare transducer auto-lifts on pipe
-
-- **WHEN** `df | po.filtering(lambda row: row["age"] > 25)`
-- **THEN** the bare transducer SHALL be lifted to a `PipelineStep` with
-  `Identity` schema transform
-- **AND** the result SHALL be a new `DataFrame` with the lifted step in its plan
-
-#### Scenario: Invalid operand raises TypeError
-
-- **WHEN** `df | 42` or `df | "hello"`
-- **THEN** the system SHALL raise a `TypeError`
-
-### Requirement: DataFrame API SHALL be immutable and always lazy
-
-The user-facing `DataFrame` API SHALL be an immutable value object. Operations via `|` return new
-DataFrames with extended plans — the original is never modified. A DataFrame
-SHALL never mutate its observable state after construction. However, internal
-engine implementations MAY use mutable structures during the materialization
-phase (e.g., inside a transducer loop) for performance optimization, provided
-this mutation is strictly isolated and not observable to the user.
-
-Materialization (executing the plan) SHALL be triggered by:
-- `repr(df)` / `_repr_html_(df)` — display
-- `for row in df` — iteration via `__iter__`
-- `len(df)` — row count via `__len__`
-- `df.collect()` — explicit force, returns a new materialized DataFrame
-
-Each materialization trigger SHALL execute the plan fresh. No internal cache
-SHALL be maintained on the DataFrame instance.
-
-#### Scenario: Display triggers collection
-
-- **WHEN** `repr(df)` is called on a DataFrame with a non-empty plan
-- **THEN** the plan SHALL be executed and the result displayed as a table
-- **AND** the DataFrame instance SHALL NOT be mutated
-
-#### Scenario: Iteration triggers collection
-
-- **WHEN** `for row in df` is used on a DataFrame with a non-empty plan
-- **THEN** the plan SHALL be executed and rows yielded as dicts
-- **AND** the DataFrame instance SHALL NOT be mutated
-
-#### Scenario: Collect returns new materialized DataFrame
-
-- **WHEN** `df2 = df.collect()` is called
-- **THEN** `df2` SHALL be a new DataFrame with the plan executed and data materialized
-- **AND** `df2` SHALL have an empty plan (data is inline)
-- **AND** the original `df` SHALL be unchanged (plan still present)
-
-#### Scenario: Repeated materialization re-executes plan
-
-- **WHEN** `repr(df)` is called twice on the same uncollected DataFrame
-- **THEN** the plan SHALL be executed both times (no internal caching)
-
-### Requirement: DataFrame display SHALL show plan and data
-
-`repr(df)` SHALL display the plan steps, schema, and the materialized data
-table. This makes the pipeline visible to the user.
-
-#### Scenario: DataFrame with plan shows plan then data
-
-- **WHEN** `repr(df)` is called on a DataFrame with plan `[where(age > 25)]`
-- **THEN** the output SHALL include the plan steps and schema
-- **AND** the output SHALL include the materialized data table
-
-#### Scenario: Collected DataFrame shows data only
-
-- **WHEN** `repr(df2)` is called on a DataFrame returned by `collect()` (empty plan)
-- **THEN** the output SHALL show the data table without plan steps
-
 ### Requirement: Pipeline step composition
 
 `step | step` SHALL return a new composed pipeline step. Composition SHALL
@@ -117,26 +18,8 @@ schema transforms compose via function composition. Both are left-to-right.
 - **WHEN** `po.where(Person.age > 25)(df)`
 - **THEN** it SHALL be equivalent to `df | po.where(Person.age > 25)`
   (returns a lazy DataFrame, does NOT force collection)
-
-### Requirement: head as take shorthand
-
-`DataFrame.head(n)` SHALL return a new DataFrame with a `taking(n)` step
-appended, lifted to a `PipelineStep` with `Identity` schema transform.
-The original DataFrame SHALL NOT be modified. The returned DataFrame
-is lazy like any other — display happens when the REPL calls `repr` on the
-return value. Early termination SHALL be supported via the `Reduced` protocol.
-
-#### Scenario: Head returns new DataFrame without mutating original
-
-- **WHEN** `df2 = df | po.where(Person.age > 25)` then `df3 = df2.head(5)`
-- **THEN** `df3` SHALL be a new lazy DataFrame with `taking(5)` in its plan
-- **AND** `df2` SHALL still be usable without the `taking(5)` in its plan
-- **AND** `repr(df3)` SHALL show at most 5 matching rows
-
-#### Scenario: Head with zero
-
-- **WHEN** `df.head(0)`
-- **THEN** the result SHALL be a DataFrame that materializes to 0 rows
+- **AND** this DataFrame-facing convenience is defined by the DataFrame facade
+  contract in `dataframe/spec.md`
 
 ### Requirement: Schema mismatch on pipe raises early error
 
@@ -145,7 +28,7 @@ schema is applied via `|` to a DataFrame with an incompatible schema. The
 error SHALL be raised at pipe time (when `|` is evaluated), not at collection.
 
 Schema validation uses the `required_columns` set stored on Expr-based
-pipeline steps (see `transducer/spec.md`). Low-level transducers lifted to
+pipeline steps. Low-level transducers lifted to
 pipeline steps have `Identity` schema and no `required_columns`, so they
 bypass schema validation.
 
@@ -282,54 +165,6 @@ The result schema SHALL be auto-generated with only the selected columns.
 - **WHEN** `po.select(Person.name)` is applied to a DataFrame with `name` and `age`
 - **THEN** the result SHALL have only the `name` column after collection
 - **AND** the result schema SHALL reflect the reduced column set
-
-### Requirement: User-facing reduce on DataFrame
-
-`po.reduce(reducer, df)` SHALL apply a reducer to a DataFrame's rows and
-return the final result. This forces collection and returns a scalar value.
-An optional `transducer` keyword parameter accepts either a `Transducer` or a
-`PipelineStep`. When a `PipelineStep` is passed, its data component (the
-transducer) SHALL be extracted and applied; the schema component is ignored.
-
-Because DataFrame iteration yields row dicts, reducers passed directly to
-`po.reduce(..., df)` SHALL be compatible with rows. Reducers over scalar
-column values SHALL use a column-bound reducer such as `sum_of(expr)` or
-`mean_of(expr)`.
-
-Only streaming transducers and streaming pipeline steps are valid in the
-`transducer=` parameter. Materializing steps such as `sort_by` and `groupby`
-SHALL raise a `TypeError` when passed to `po.reduce`, because `reduce` only
-knows how to wrap a reducer with row-at-a-time transformations.
-
-#### Scenario: Reduce DataFrame rows with count
-
-- **WHEN** `po.reduce(po.count, df)` is called on a DataFrame with rows
-  `{"age": 30}`, `{"age": 25}`, `{"age": 40}`
-- **THEN** the result SHALL be `3`
-
-#### Scenario: Reduce DataFrame column with column-bound reducer
-
-- **WHEN** `po.reduce(po.sum_of(Person.age), df)` is called where `df` has column `age`
-  with values `[30, 25, 40]`
-- **THEN** the result SHALL be `95`
-
-#### Scenario: Reduce with PipelineStep as transducer
-
-- **WHEN** `po.reduce(po.count, df, transducer=po.where(Person.age > 25))` is called
-  where `df` has ages `[30, 20, 40]`
-- **THEN** the data component of `po.where(...)` SHALL be extracted
-- **AND** the transducer SHALL filter to ages `[30, 40]` and the count SHALL be `2`
-
-#### Scenario: Reduce with bare transducer
-
-- **WHEN** `po.reduce(po.count, df, transducer=po.filtering(lambda r: r["age"] > 25))`
-- **THEN** the bare transducer SHALL be applied directly to the reducer
-
-#### Scenario: Reduce rejects materializing pipeline steps
-
-- **WHEN** `po.reduce(po.count, df, transducer=po.sort_by(Person.age))` is called
-- **THEN** the system SHALL raise a `TypeError` indicating that materializing
-  pipeline steps cannot be used as reducer wrappers
 
 ### Requirement: PipelineStep SHALL only be constructed through validated factories
 
