@@ -368,28 +368,35 @@ An optional `transducer` keyword parameter accepts either a `Transducer` or a
 `PipelineStep`. If a `PipelineStep` is passed, only its data component SHALL be
 used as the reducer wrapper.
 
-Only streaming transducers and streaming pipeline steps are valid in the
-`transducer=` parameter. Materializing pipeline steps SHALL raise a `TypeError`.
+**Constraint Boundary:** Only streaming transducers and streaming pipeline steps
+(e.g., `where`, `select`) are valid in the `transducer=` parameter.
+Materializing pipeline steps (e.g., `sort_by`, `distinct` on certain columns)
+SHALL raise a `TypeError` when passed as a `transducer=` argument. However,
+the source `df` itself MAY contain any number of materializing steps in its
+plan; `po.reduce` SHALL execute that plan fully before applying the final
+reduction.
 
 #### Scenario: Reduce DataFrame rows with count
 
 - **WHEN** `po.reduce(po.count, df)` is called on a DataFrame with 3 rows
 - **THEN** the result SHALL be `3`
 
-#### Scenario: Reduce DataFrame column with column-bound reducer
+#### Scenario: Reduce on sorted source DataFrame is valid
 
-- **WHEN** `po.reduce(po.sum_of(Person.age), df)` is called
-- **THEN** the result SHALL be the sum of the extracted `age` values
+- **WHEN** `po.reduce(po.to_list, df | po.sort_by(Person.age))` is called
+- **THEN** the sort SHALL be executed as part of the DataFrame materialization
+- **AND** the reduction SHALL process rows in the sorted order
 
 #### Scenario: Reduce with PipelineStep as transducer
 
 - **WHEN** `po.reduce(po.count, df, transducer=po.where(Person.age > 25))` is called
 - **THEN** the pipeline step's data transform SHALL wrap the reducer
 
-#### Scenario: Reduce rejects materializing pipeline steps
+#### Scenario: Reduce rejects materializing pipeline steps as transducer argument
 
 - **WHEN** `po.reduce(po.count, df, transducer=po.sort_by(Person.age))` is called
-- **THEN** the system SHALL raise a `TypeError`
+- **THEN** the system SHALL raise a `TypeError` because `sort_by` is not
+  a streaming transducer
 
 ### Requirement: Auto-generated schemas after schema-changing steps
 

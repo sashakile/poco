@@ -7,6 +7,9 @@ The system SHALL define a `Reducer` protocol with three methods:
 - `step(acc: Acc, item) -> Acc | Reduced[Acc]`
 - `complete(acc: Acc) -> Result`
 
+When used in a DataFrame context, the `item` passed to `step` SHALL be a
+materialized row matching the shared contract defined in `row-model/spec.md`.
+
 #### Scenario: Reducer with all three phases
 
 - **WHEN** a `mean` reducer is applied to `[10, 20, 30]`

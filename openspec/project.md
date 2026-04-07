@@ -41,30 +41,27 @@ Goals:
   - Σ (left Kan extension) → groupby-combine, aggregate
   - Π (right Kan extension) → join, normalize
 
-**Lazy IR:**
-- Operations build expression trees (free monad), not immediate results
-- `.collect()` or iteration materializes the computation
+**Lazy Pipeline IR:**
+- Operations build a high-level `PipelineStep` tree, not immediate results
+- Each step contains a `DataTransform` (transducer) and a `SchemaTransform`
+- Materialization occurs fresh on each trigger (iteration, repr, collect)
 - Enables backend-agnostic optimization (predicate pushdown, fusion)
 
-**Swappable engines:**
-- Abstract protocols for Storage (how data is held) and Compute (how ops execute)
-- Pure Python default implementation
-- Adapter pattern for numpy or other backends
+**Row Model Contract:**
+- A single shared contract for materialized rows: `dict[str, object]`
+- Keys are insertion-ordered and correspond to the schema order
+- Used across expression evaluation, reducers, and transducers
 
-**Data orientation:**
-- Column-primary internal storage
-- Row-wise access as a view/adapter over columnar storage
-- Both mutable and immutable paths (performance-dependent)
+**Three-Phase Reducer Protocol:**
+- `init()`: Produce initial accumulator
+- `step(acc, item)`: Incorporate item, supports early termination via `Reduced(acc)`
+- `complete(acc)`: Finalize result (e.g., divide sum by count for mean)
+- Reducers drive the physical execution of all DataFrame operations
 
 **Transducers:**
 - Composable transformations decoupled from input/output (Clojure-inspired)
 - Natural transformations between fold functors
-- Same pipeline works across backends (list, numpy, lazy iterator)
-
-**Persistent data structures:**
-- HAMT (via pyrsistent/immutables) for structural parts (column index, schema)
-- Contiguous arrays for actual column data
-- Copy-on-write semantics where immutability is too expensive
+- Stateful transducers (e.g., `taking`, `distinct`) manage isolated closure state
 
 ### Testing Strategy
 

@@ -6,6 +6,9 @@ A transducer SHALL be a callable that transforms one reducer into another.
 The transducer SHALL wrap all three phases (init, step, complete) of the
 inner reducer as defined in `reducer/spec.md`.
 
+In a DataFrame pipeline, transducers SHALL operate on items that satisfy the
+materialized row contract defined in `row-model/spec.md`.
+
 #### Scenario: Filtering transducer
 
 - **WHEN** a `filtering(pred)` transducer wraps a `to_list` reducer

@@ -89,13 +89,20 @@ schema is provided. The inferred schema SHALL be a dynamically created
 ### Requirement: Numeric type promotion in inference
 
 When a column contains compatible numeric types, the system SHALL promote to
-the widest type in the hierarchy `bool < int < float`. Only truly incompatible
-types (e.g., `str` and `int`) SHALL raise a `SchemaError`.
+the widest type in the hierarchy `bool < int < float`. This promotion SHALL be
+orthogonal to nullability inference. If a numeric column also contains `None`,
+the final type SHALL be the `Optional` variant of the promoted numeric type.
 
 #### Scenario: int and float promote to float
 
 - **WHEN** a user creates `po.DataFrame({"val": [1, 2.0, 3]})`
 - **THEN** the inferred type SHALL be `float`
+
+#### Scenario: Promotion interacts with nullability
+
+- **WHEN** a user creates `po.DataFrame({"val": [1, 2.0, None]})`
+- **THEN** types SHALL promote to `float` first, then nullability SHALL be
+  applied, resulting in `Optional[float]` (i.e., `float | None`)
 
 #### Scenario: bool and int promote to int
 
@@ -154,13 +161,22 @@ classes. A `@po.schema`-decorated class MAY inherit from another
 `@po.schema` class, and the subclass SHALL include all fields from the parent
 plus its own fields.
 
+Field overrides in a subclass SHALL be permitted only if the new type is
+exactly equivalent to the parent's field type. Overrides that attempt to
+change the type SHALL be rejected.
+
 #### Scenario: Subclass inherits parent fields
 
 - **WHEN** a user defines `@po.schema class Employee(Person): salary: float`
 - **THEN** `Employee` SHALL have all fields from `Person` plus `salary`
 - **AND** `Employee.salary` SHALL return a `ColumnRef("salary", dtype=float)` expression
 
-#### Scenario: Subclass field override raises error
+#### Scenario: Identical field override is permitted
+
+- **WHEN** a user defines `@po.schema class Worker(Person): age: int`
+- **THEN** the schema SHALL be valid since `Worker` merely restates the `int` type
+
+#### Scenario: Subclass field type override raises error
 
 - **WHEN** a user defines `@po.schema class Bad(Person): age: str`
 - **THEN** the system SHALL raise a `SchemaError` indicating that field `age`

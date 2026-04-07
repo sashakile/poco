@@ -117,7 +117,9 @@ comparison between Expr objects (returns `bool`).
 ### Requirement: Expression evaluation against a row
 
 The system SHALL evaluate an `Expr` against a materialized row as defined in
-`row-model/spec.md` and return the computed result.
+`row-model/spec.md` and return the computed result. All expressions SHALL
+consume the shared row contract (a `dict[str, object]` mapping column names
+to values).
 
 #### Scenario: Evaluate comparison
 
