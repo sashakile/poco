@@ -5,11 +5,18 @@
 `po.join(left_df, right_df, on=expr, how="inner")` SHALL perform a relational
 join and return a lazy `DataFrame` with the combined schema.
 
-The `on` expression SHALL be:
-- a single equality `left_expr == right_expr`, or
-- a conjunction of equalities combined with `&`
+The `on` expression SHALL be restricted to:
+- a single equality of column references: `ColumnRef == ColumnRef`, or
+- a conjunction of column-reference equalities combined with `&`
 
-**Positional Constraint:** Each equality SHALL be interpreted positionally based on the expression tree's structural properties: the `left` operand of the `BinOp(EQ, left, right)` node is evaluated against the left input DataFrame's schema, and the `right` operand is evaluated against the right input DataFrame's schema. If the schema of the `left` operand does not match the left DataFrame, or the schema of the `right` operand does not match the right DataFrame, the join SHALL fail with a `SchemaError`.
+Computed expressions (e.g., `L.id + 1 == R.id`) SHALL NOT be accepted as
+join predicates. The system SHALL raise a `TypeError` if a non-ColumnRef
+expression is used in a join predicate.
+
+**Positional Constraint:** Each equality SHALL be interpreted positionally:
+the `left` operand of `BinOp(EQ, left, right)` is evaluated against the left
+input DataFrame's schema, and the `right` operand is evaluated against the
+right input DataFrame's schema.
 
 **Key Preservation:** In the resulting schema, the name of the column from the
 left-hand side of the equality expression SHALL be preserved as the join key.
@@ -25,12 +32,20 @@ left-hand side of the equality expression SHALL be preserved as the join key.
 - **WHEN** `result = po.join(df_emp, df_dept, on=..., how="inner")`
 - **THEN** no computation SHALL occur until materialization is triggered
 
+#### Scenario: Computed join predicate raises error
+
+- **WHEN** `po.join(df1, df2, on=(S1.id + 1 == S2.id))` is called
+- **THEN** the system SHALL raise a `TypeError` indicating that join
+  predicates must be column-reference equalities
+
 ### Requirement: Supported join types
 
 The system SHALL support `inner`, `left`, `right`, and `outer` joins. The
-`how` parameter SHALL default to `"inner"`. Join conditions involving `None`
-values SHALL follow explicit SQL-like truth tables, treating `None` as an unknown
-value that cannot equal itself.
+`how` parameter SHALL default to `"inner"`. An unsupported `how` value SHALL
+raise a `ValueError` listing valid options.
+
+Join conditions involving `None` values SHALL follow explicit SQL-like truth
+tables, treating `None` as an unknown value that cannot equal itself.
 
 **Null Equality Truth Table:**
 - `Value == Value` → `True` (if values are equal)
@@ -48,11 +63,38 @@ left, or right joins.
 - **THEN** all rows from `left` SHALL be preserved
 - **AND** non-matching right-side columns SHALL be `None`
 
+#### Scenario: Right join preserves right rows
+
+- **WHEN** `po.join(left, right, on=..., how="right")` is called
+- **THEN** all rows from `right` SHALL be preserved
+- **AND** non-matching left-side columns SHALL be `None`
+
+#### Scenario: Outer join preserves both sides
+
+- **WHEN** `po.join(left, right, on=..., how="outer")` is called
+- **THEN** all rows from both sides SHALL be preserved
+- **AND** non-matching columns on either side SHALL be `None`
+
 #### Scenario: Join on None values does not match
 
 - **WHEN** `po.join(left, right, on=(L.key == R.key))` is called
 - **AND** both rows have `None` in the `key` column
 - **THEN** these rows SHALL NOT match
+
+#### Scenario: Invalid how raises error
+
+- **WHEN** `po.join(left, right, on=..., how="cross")` is called
+- **THEN** the system SHALL raise a `ValueError` listing valid join types
+
+#### Scenario: Empty left DataFrame in inner join
+
+- **WHEN** `po.join(empty_df, right, on=..., how="inner")` is materialized
+- **THEN** the result SHALL be an empty DataFrame with the combined schema
+
+#### Scenario: Empty right DataFrame in left join
+
+- **WHEN** `po.join(left, empty_df, on=..., how="left")` is materialized
+- **THEN** all left rows SHALL be preserved with right-side columns as `None`
 
 ### Requirement: Relational output schemas
 
@@ -76,13 +118,14 @@ materialization.
 ### Requirement: Join collision handling and nullable-side promotion
 
 Join output schemas SHALL disambiguate colliding non-key columns with suffixes.
+Default suffixes SHALL be `("_left", "_right")`.
 For `left`, `right`, and `outer` joins, columns from the nullable side SHALL be
 promoted to `Optional` variants.
 
 #### Scenario: Shared columns get suffixes
 
 - **WHEN** `po.join(df1, df2, on=...)` and both inputs contain `name`
-- **THEN** the result schema SHALL disambiguate the colliding columns with suffixes
+- **THEN** the result schema SHALL disambiguate as `name_left` and `name_right`
 
 #### Scenario: Custom suffixes are supported
 
@@ -91,7 +134,7 @@ promoted to `Optional` variants.
 
 #### Scenario: Self-join supports explicit suffixes
 
-- **WHEN** `po.join(df, df, on=(df.schema.manager_id == df.schema.id), suffixes=("", "_mgr"))`
+- **WHEN** `po.join(df, df, on=(S.manager_id == S.id), suffixes=("", "_mgr"))`
 - **THEN** the result SHALL disambiguate colliding columns using the provided suffixes
 
 #### Scenario: Left join promotes right types to Optional
@@ -99,9 +142,20 @@ promoted to `Optional` variants.
 - **WHEN** `po.join(left, right, on=..., how="left")` and `right.salary` is `int`
 - **THEN** the result schema SHALL expose the right-side salary column as `int | None`
 
+#### Scenario: Right join promotes left types to Optional
+
+- **WHEN** `po.join(left, right, on=..., how="right")` and `left.name` is `str`
+- **THEN** the result schema SHALL expose the left-side name column as `str | None`
+
+#### Scenario: Outer join promotes both sides to Optional
+
+- **WHEN** `po.join(left, right, on=..., how="outer")`
+- **THEN** non-key columns from both sides SHALL be promoted to `Optional` variants
+
 ### Requirement: Multi-column equi-joins
 
-The system SHALL support multiple equality conditions combined with `&`.
+The system SHALL support multiple column-reference equality conditions combined
+with `&`.
 
 #### Scenario: Join on two columns
 
@@ -112,7 +166,14 @@ The system SHALL support multiple equality conditions combined with `&`.
 
 `po.groupby(*key_exprs, **aggregations)` SHALL accept one or more `Expr`
 objects as group keys and named aggregation reducers. It SHALL return a
-`PipelineStep`, preserving the endomorphism `DataFrame | step -> DataFrame`.
+`PipelineStep` (materializing), preserving the endomorphism
+`DataFrame | step -> DataFrame`.
+
+At least one aggregation keyword argument SHALL be provided. Calling
+`po.groupby(Person.dept)` with no aggregations SHALL raise a `ValueError`.
+
+Key-aggregation name collisions SHALL raise a `SchemaError` (e.g.,
+`po.groupby(Person.dept, dept=po.count_of())`).
 
 #### Scenario: Groupby single column with aggregation
 
@@ -125,32 +186,36 @@ objects as group keys and named aggregation reducers. It SHALL return a
 - **THEN** the result SHALL be partitioned by unique combinations of `dept` and `city`
 - **AND** `(None, 1)` and `(None, 2)` SHALL be treated as distinct groups
 
+#### Scenario: None group keys are treated as equal
+
+- **WHEN** rows with `dept` as `None` are grouped by `Person.dept`
+- **THEN** all `None`-keyed rows SHALL belong to the same group
+
 #### Scenario: Groupby preserves DataFrame endomorphism
 
 - **WHEN** `result = df | po.groupby(Person.dept, total=po.sum_of(Person.salary))`
 - **THEN** `result` SHALL be a `DataFrame`
 
-### Requirement: Relational adjunction properties (Σ ⊣ Δ ⊣ Π)
+#### Scenario: Groupby without aggregations raises error
 
-Relational operations SHALL satisfy the following properties, following Spivak's functorial data migration:
+- **WHEN** `po.groupby(Person.dept)` is called with no aggregation kwargs
+- **THEN** the system SHALL raise a `ValueError`
 
-1.  **Δ Pullback (Select/Project/Rename):** Pullback along a schema mapping `f: B → A` SHALL map a DataFrame over schema `A` to a DataFrame over schema `B`. `df | po.select(...)` and `df | po.where(...)` SHALL correspond to this pullback mapping.
-2.  **Σ Left Kan Extension (Groupby/Aggregate):** Grouping and aggregation SHALL correspond to the left adjoint `Σ` of the pullback `Δ`. It SHALL map data over schema `B` to schema `A` by aggregating along the fiber.
-3.  **Π Right Kan Extension (Join/Normalize):** Relational join SHALL correspond to the right adjoint `Π` of the pullback `Δ`. It SHALL preserve the cartesian product of schemas and represent universal properties of the combined state.
+#### Scenario: Key-aggregation name collision raises error
 
-#### Scenario: Pullback-Aggregation (Σ ⊣ Δ) Round-trip Property
-- **WHEN** data is migrated via `Δ` (projected) and then aggregated via `Σ` (left Kan extension)
-- **THEN** the round-trip result SHALL satisfy the universal property of the adjunction Σ ⊣ Δ.
+- **WHEN** `po.groupby(Person.dept, dept=po.count_of())` is called
+- **THEN** the system SHALL raise a `SchemaError` indicating the name collision
 
-#### Scenario: Join-Pullback (Δ ⊣ Π) Round-trip Property
-- **WHEN** two DataFrames are joined via `Π` (right Kan extension) and then projected via `Δ`
-- **THEN** the result SHALL correctly pull back data according to the join predicate mapping.
+#### Scenario: Groupby validates columns at pipe time
 
-#### Scenario: Commutative laws for relational operators
-- **WHEN** relational operators are composed (e.g., filter before or after a project)
-- **THEN** the result SHALL follow the functorial laws (structure-preserving maps).
-- **WHEN** `df | po.groupby(Person.department, count=po.count_of())`
-- **THEN** the system SHALL raise a `SchemaError` before collection
+- **WHEN** `df | po.groupby(Person.salary, n=po.count_of())` where `df` has
+  no `salary` column
+- **THEN** the system SHALL raise a `SchemaError` at pipe time
+
+### Requirement: Join and groupby validation
+
+The system SHALL validate join and groupby operations at call time or pipe
+time, before collection.
 
 #### Scenario: Join missing column raises error at call time
 
@@ -160,9 +225,22 @@ Relational operations SHALL satisfy the following properties, following Spivak's
 #### Scenario: Unsupported join predicate raises error at call time
 
 - **WHEN** `po.join(df1, df2, on=(S1.salary > S2.salary))` is called
-- **THEN** the system SHALL raise a `ValueError` indicating that only equi-join predicates are supported
+- **THEN** the system SHALL raise a `ValueError` indicating that only
+  column-reference equalities are supported as join predicates
 
 #### Scenario: Relational result composes with downstream pipeline
 
 - **WHEN** `joined = po.join(df1, df2, on=...)` and `joined | po.where(joined.schema.salary > 50000)`
 - **THEN** the result SHALL compose as a normal lazy DataFrame pipeline
+
+### Requirement: Deterministic join output order
+
+Join results SHALL produce rows in a deterministic order: for each left row
+(in left-input order), all matching right rows SHALL appear in right-input
+order.
+
+#### Scenario: Join preserves input order
+
+- **WHEN** `po.join(left, right, on=..., how="inner")` is materialized
+- **THEN** result rows SHALL appear ordered by left-row position first,
+  then by right-row position for each match

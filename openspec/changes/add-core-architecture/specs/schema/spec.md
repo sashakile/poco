@@ -35,21 +35,22 @@ column. Accessing a field on an instance returns the actual value.
 
 ### Requirement: Runtime schema object
 
-`df.schema` SHALL return the `@po.schema` class itself (for declared schemas)
-or a dynamically created `@po.schema` class (for inferred schemas). In both
-cases, class-level field access SHALL return `Expr` nodes.
+A runtime schema object SHALL be either a `@po.schema`-decorated class (for
+declared schemas) or a dynamically created `@po.schema` class (for inferred
+schemas). In both cases, class-level field access SHALL return `Expr` nodes.
+The `DataFrame.schema` property that exposes this object is defined in
+`dataframe/spec.md`.
 
-#### Scenario: Declared schema accessible
+#### Scenario: Declared schema returns Expr on class access
 
-- **WHEN** `df = po.DataFrame({"name": ["Ana"], "age": [30]}, schema=Person)`
-- **THEN** `df.schema` SHALL be the `Person` class
-- **AND** `df.schema.age` SHALL return a `ColumnRef("age", dtype=int)` expression
+- **WHEN** a `@po.schema` class `Person` is used as a runtime schema
+- **THEN** `Person.age` SHALL return a `ColumnRef("age", dtype=int)` expression
 
-#### Scenario: Inferred schema accessible
+#### Scenario: Dynamically created schema returns Expr on class access
 
-- **WHEN** `df = po.DataFrame({"name": ["Ana"], "age": [30]})`
-- **THEN** `df.schema` SHALL be a dynamically created `@po.schema` class
-- **AND** `df.schema.age` SHALL return a `ColumnRef("age", dtype=int)` expression
+- **WHEN** a schema is dynamically created with fields `name: str` and `age: int`
+- **THEN** class-level access on the schema SHALL return `Expr` nodes
+- **AND** `DynSchema.age` SHALL return a `ColumnRef("age", dtype=int)` expression
 
 ### Requirement: Schema inference from data
 
@@ -73,6 +74,12 @@ schema is provided. The inferred schema SHALL be a dynamically created
 - **THEN** the system SHALL raise a `SchemaError` with a message identifying
   the column `"val"` and the incompatible types found (`int`, `str`, `float`)
 - **AND** the error message SHALL suggest declaring an explicit schema
+
+#### Scenario: Unsupported homogeneous type raises SchemaError on inference
+
+- **WHEN** a user creates `po.DataFrame({"data": [{"a": 1}, {"b": 2}]})`
+- **THEN** the system SHALL raise a `SchemaError` indicating that `dict` is
+  not a supported column type and listing the supported types
 
 #### Scenario: None values infer type from non-None values
 
@@ -138,6 +145,30 @@ the unsupported type and listing supported types.
 
 - **WHEN** a user declares `@po.schema class Row: age: int | None`
 - **THEN** the schema SHALL accept `age` as `Optional[int]`
+
+### Requirement: Column name constraints
+
+The system SHALL require that column names are valid Python identifiers and
+SHALL reject Python keywords as column names. Column names that are not valid
+identifiers SHALL cause a SchemaError to be raised.
+
+#### Scenario: Space in column name raises error
+
+- **WHEN** `po.DataFrame({"first name": ["Ana"]})`
+- **THEN** the system SHALL raise a `SchemaError` indicating `"first name"`
+  is not a valid Python identifier
+
+#### Scenario: Python keyword as column name raises error
+
+- **WHEN** `po.DataFrame({"class": ["A"]})`
+- **THEN** the system SHALL raise a `SchemaError` indicating `"class"` is a
+  reserved Python keyword and cannot be used as a column name
+
+#### Scenario: Column name starting with digit raises error
+
+- **WHEN** `@po.schema class Bad: pass` with a field named `1age`
+- **THEN** the system SHALL raise a `SchemaError` (Python rejects this
+  at class definition time; the schema decorator need not handle it separately)
 
 ### Requirement: Schema to code bridge
 

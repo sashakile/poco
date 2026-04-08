@@ -213,3 +213,80 @@ These methods are available on all `Expr` variants.
 - **WHEN** `Person.age > 30` is evaluated against `{"age": None}`
 - **THEN** a `NullValueError` SHALL still be raised (fill_null must be applied
   explicitly; it does not change the behavior of other operators)
+
+### Requirement: Expression required_columns
+
+`Expr` SHALL expose a `required_columns` property returning a `set[str]` of
+column names referenced by the expression tree.
+
+- `ColumnRef(name, dtype)` → `{name}`
+- `Literal(value)` → `set()` (empty)
+- `BinOp(op, left, right)` → `left.required_columns | right.required_columns`
+- `UnaryOp(op, operand)` → `operand.required_columns`
+
+#### Scenario: Single column reference
+
+- **WHEN** `Person.age.required_columns` is accessed
+- **THEN** the result SHALL be `{"age"}`
+
+#### Scenario: Compound expression
+
+- **WHEN** `(Person.age > 25).required_columns` is accessed
+- **THEN** the result SHALL be `{"age"}`
+
+#### Scenario: Multi-column expression
+
+- **WHEN** `(Person.age + Person.salary).required_columns` is accessed
+- **THEN** the result SHALL be `{"age", "salary"}`
+
+#### Scenario: Literal has no required columns
+
+- **WHEN** `Literal(42).required_columns` is accessed
+- **THEN** the result SHALL be `set()` (empty)
+
+### Requirement: Expression result type inference
+
+`Expr` SHALL support result-type inference for use by schema-changing
+operations such as `derive`. The following rules SHALL apply for supported
+scalar types (`int`, `float`, `str`, `bool`):
+
+**Arithmetic operators** (`+`, `-`, `*`, `/`):
+- `int op int` → `int` (except `/` which always produces `float`)
+- `int op float` or `float op int` → `float`
+- `float op float` → `float`
+- `str + str` → `str` (concatenation)
+- All other combinations → type cannot be inferred; raise `SchemaError`
+
+**Comparison operators** (`>`, `<`, `>=`, `<=`, `==`, `!=`):
+- Any supported types → `bool`
+
+**Boolean operators** (`&`, `|`, `~`):
+- `bool op bool` → `bool`
+
+**Null-handling**:
+- `expr.is_null()` → `bool`
+- `expr.fill_null(default)` → same type as `expr` (non-Optional variant)
+
+If result type cannot be statically inferred from the expression tree, the
+system SHALL raise a `SchemaError` at pipeline construction time with a
+message suggesting explicit type annotation.
+
+#### Scenario: Arithmetic type promotion
+
+- **WHEN** `Person.age + Person.salary` where `age: int` and `salary: float`
+- **THEN** the inferred result type SHALL be `float`
+
+#### Scenario: Division always produces float
+
+- **WHEN** `Person.age / Literal(2)` where `age: int`
+- **THEN** the inferred result type SHALL be `float`
+
+#### Scenario: Comparison produces bool
+
+- **WHEN** `Person.age > 30` where `age: int`
+- **THEN** the inferred result type SHALL be `bool`
+
+#### Scenario: fill_null strips Optional
+
+- **WHEN** `Person.age.fill_null(0)` where `age: int | None`
+- **THEN** the inferred result type SHALL be `int`

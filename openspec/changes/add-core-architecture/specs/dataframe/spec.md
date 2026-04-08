@@ -347,6 +347,30 @@ appended, lifted to a `PipelineStep` with `Identity` schema transform.
 - **WHEN** `df.head(0)`
 - **THEN** the result SHALL materialize to 0 rows
 
+#### Scenario: Head with negative raises error
+
+- **WHEN** `df.head(-1)` is called
+- **THEN** the system SHALL raise a `ValueError`
+
+### Requirement: DataFrame schema property
+
+`df.schema` SHALL return the `@po.schema` class associated with this
+DataFrame. For DataFrames constructed with an explicit schema, it returns
+that class. For DataFrames constructed without a schema, it returns a
+dynamically inferred `@po.schema` class (see `schema/spec.md`).
+
+#### Scenario: Declared schema accessible via df.schema
+
+- **WHEN** `df = po.DataFrame({"name": ["Ana"], "age": [30]}, schema=Person)`
+- **THEN** `df.schema` SHALL be the `Person` class
+- **AND** `df.schema.age` SHALL return a `ColumnRef("age", dtype=int)` expression
+
+#### Scenario: Inferred schema accessible via df.schema
+
+- **WHEN** `df = po.DataFrame({"name": ["Ana"], "age": [30]})`
+- **THEN** `df.schema` SHALL be a dynamically created `@po.schema` class
+- **AND** `df.schema.age` SHALL return a `ColumnRef("age", dtype=int)` expression
+
 ### Requirement: DataFrame generic typing
 
 `DataFrame` SHALL support `DataFrame[Schema]` syntax for static typing.
@@ -401,17 +425,12 @@ reduction.
 ### Requirement: Auto-generated schemas after schema-changing steps
 
 The system SHALL auto-generate output schemas for schema-changing steps.
-Schema-changing operations such as `select`, `derive`, `groupby`, and `join`
-SHALL produce a `df.schema` object that reflects the output columns and types
-without requiring materialization.
+Schema-changing operations such as `select` and `derive` SHALL produce a
+`df.schema` object that reflects the output columns and types without
+requiring materialization. Relational operations (`groupby`, `join`) also
+produce auto-generated schemas; their rules are defined in `relational/spec.md`.
 
 #### Scenario: Select produces projected schema
 
 - **WHEN** `df2 = df | po.select(Person.name, Person.age)`
 - **THEN** `df2.schema` SHALL expose only `name` and `age`
-
-#### Scenario: Join produces combined schema before collection
-
-- **WHEN** `joined = po.join(df_left, df_right, on=(L.id == R.id))`
-- **THEN** `joined.schema` SHALL reflect the joined output columns before
-  `joined.collect()` is called

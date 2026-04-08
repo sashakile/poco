@@ -1,19 +1,11 @@
 ## ADDED Requirements
 
-### Requirement: Pipeline concurrency and parallel execution
+### Requirement: Pipeline reusability across DataFrames
 
-The system SHALL support concurrent evaluation of streaming pipeline steps (transducers).
-- **Thread-Safety Invariant:** Pure transducers (where, select, mapping) SHALL be thread-safe for parallel execution.
-- **Race-Freedom Invariant:** Concurrent evaluation of a streaming pipeline on independent data partitions SHALL produce the same set of rows as sequential evaluation, preserving row order within each partition.
-- **Materialization Boundary:** Materializing steps (sort_by, distinct) SHALL act as synchronization barriers. All rows must be collected and sorted/deduplicated before the next partition can proceed.
+Composed pipeline steps SHALL be reusable across multiple DataFrames.
 
-#### Scenario: Parallel evaluation on partitions
-- **WHEN** a pipeline is executed on multiple threads with partitioned data
-- **THEN** each thread SHALL produce results independent of others, preserving the data transformations of each step.
+#### Scenario: Reusable pipeline
 
-#### Scenario: Result consistency
-- **WHEN** a pipeline is evaluated concurrently or sequentially
-- **THEN** the set of final materialized rows SHALL be identical (extensional equality).
 - **WHEN** `pipeline = po.where(Person.age > 25) | po.select(Person.name)`
 - **THEN** `pipeline` SHALL be a composed pipeline step
 - **AND** `df1 | pipeline` and `df2 | pipeline` SHALL both produce the expected
@@ -24,8 +16,6 @@ The system SHALL support concurrent evaluation of streaming pipeline steps (tran
 - **WHEN** `po.where(Person.age > 25)(df)`
 - **THEN** it SHALL be equivalent to `df | po.where(Person.age > 25)`
   (returns a lazy DataFrame, does NOT force collection)
-- **AND** this DataFrame-facing convenience is defined by the DataFrame facade
-  contract in `dataframe/spec.md`
 
 ### Requirement: Schema mismatch on pipe raises early error
 
@@ -131,6 +121,12 @@ validation at pipe time.
 - **THEN** the system SHALL raise a `ValueError` indicating that at least
   one column expression is required
 
+#### Scenario: select rejects computed expressions
+
+- **WHEN** `po.select(Person.age + 1)` is called with a non-ColumnRef Expr
+- **THEN** the system SHALL raise a `TypeError` indicating that `select`
+  only accepts column references
+
 ### Requirement: Cross-layer composition
 
 The system SHALL support composing a bare `Transducer` with a `PipelineStep`
@@ -157,12 +153,16 @@ then proceed component-wise.
 - **WHEN** `po.where(Person.age > 25)` is applied to a DataFrame
 - **THEN** only rows where `age > 25` SHALL be included after collection
 
-### Requirement: select builds project pipeline step from Exprs
+### Requirement: select builds project pipeline step from ColumnRefs
 
-`po.select(*exprs)` SHALL accept one or more `Expr` (column references) and
+`po.select(*exprs)` SHALL accept one or more `ColumnRef` expressions and
 return a pipeline step with:
 - data transform: a transducer that keeps only the selected columns per row
 - schema transform: `Project(selected_column_names)`
+
+Passing a non-`ColumnRef` expression (e.g., `Person.age + 1`) SHALL raise a
+`TypeError` indicating that `select` only accepts column references, not
+computed expressions. Use `derive` to create computed columns first.
 
 The result schema SHALL be auto-generated with only the selected columns.
 
@@ -175,11 +175,22 @@ The result schema SHALL be auto-generated with only the selected columns.
 ### Requirement: PipelineStep SHALL only be constructed through validated factories
 
 `PipelineStep` SHALL NOT expose a public constructor that accepts arbitrary
-`(transducer, schema_transform)` pairs. Pipeline steps SHALL only be created
+`(data_op, schema_transform)` pairs. Pipeline steps SHALL only be created
 through validated factory functions (`where()`, `select()`, `derive()`,
 `sort_by()`, `distinct()`, `groupby()`, `comp()`, and cross-layer lifting)
-that guarantee data-schema coherence — i.e., the data transform and schema
+that guarantee data-schema coherence — i.e., the data operation and schema
 transform components are always consistent with each other.
+
+The data component of a `PipelineStep` SHALL be a `DataOp`, which is either:
+- `StreamingOp` — backed by a transducer (processes rows one at a time)
+- `MaterializingOp` — requires all input rows before producing output
+  (e.g., `sort_by`, `groupby`)
+
+Streaming steps (`where`, `select`, `derive`, `distinct`) use `StreamingOp`.
+Materializing steps (`sort_by`, `groupby`) use `MaterializingOp`.
+
+When composing steps via `|`, if either step is materializing, the composed
+step SHALL be materializing (the collection boundary is preserved).
 
 #### Scenario: Factory functions are the only public constructors
 
@@ -212,17 +223,22 @@ It preserves all input columns and adds the named columns with their types.
 `po.comp(first=xf1, second=xf2)` SHALL compose transducers or pipeline steps
 in left-to-right data flow order: `xf1` is applied first, then `xf2`.
 `po.comp(first=a, second=b)` SHALL be equivalent to `a | b`.
-`po.comp()` with no arguments SHALL return the identity.
+`po.comp()` with no arguments SHALL return the identity transducer (as
+defined in `transducer/spec.md`). When used in a pipeline context, the
+identity transducer is auto-lifted to a pipeline step via cross-layer
+composition.
 
 #### Scenario: comp matches pipe order
 
 - **WHEN** `po.comp(first=po.where(Person.age > 25), second=po.select(Person.name))`
 - **THEN** the result SHALL be the same as `po.where(Person.age > 25) | po.select(Person.name)`
 
-#### Scenario: comp with no args returns identity
+#### Scenario: comp with no args returns identity transducer
 
 - **WHEN** `po.comp()` is called with no arguments
-- **THEN** it SHALL return an identity pipeline step that passes data and schema unchanged
+- **THEN** it SHALL return the identity transducer
+- **AND** when used in a pipeline via `|`, it SHALL be auto-lifted to a
+  pipeline step with `Identity` schema transform
 
 ### Requirement: sort_by orders rows by expression evaluation
 
@@ -276,9 +292,9 @@ Schema transform: `Identity` (columns unchanged, only row order changes).
 
 #### Scenario: Sort composes with streaming steps
 
-- **WHEN** `df | po.where(Person.age > 25) | po.sort_by(Person.age) | po.head(5)`
+- **WHEN** `(df | po.where(Person.age > 25) | po.sort_by(Person.age)).head(5)`
 - **THEN** the pipeline SHALL filter (streaming), collect and sort (materializing),
-  then take the first 5 (streaming)
+  then take the first 5 via `taking(5)` (streaming)
 
 #### Scenario: Sort validates columns at pipe time
 
@@ -305,15 +321,38 @@ Schema transform: `Identity` (columns unchanged, only row order changes).
 - **WHEN** `po.sort_by(Person.dept, Person.age)` is created
 - **THEN** the pipeline step's `required_columns` SHALL be `{"dept", "age"}`
 
+#### Scenario: Sort with None key raises NullValueError
+
+- **WHEN** `df | po.sort_by(Person.age)` and a row has `age` as `None`
+- **THEN** the system SHALL raise a `NullValueError` at materialization time
+- **AND** the error message SHALL suggest using `fill_null()` or filtering
+  nulls before sorting
+
+#### Scenario: head on sorted DataFrame materializes sort first
+
+- **WHEN** `(df | po.sort_by(Person.age)).head(5)` is materialized
+- **THEN** the sort SHALL execute on all rows first, then `taking(5)` SHALL
+  return the first 5 sorted rows
+
+#### Scenario: head before sort limits input to sort
+
+- **WHEN** `df.head(5) | po.sort_by(Person.age)` is materialized
+- **THEN** only 5 rows SHALL be taken first, then those 5 SHALL be sorted
+
 ### Requirement: derive adds computed columns via Expr evaluation
 
 `po.derive(**named_exprs)` SHALL accept one or more keyword arguments where
 each key is the new column name and each value is an `Expr`. It SHALL return
 a `PipelineStep` that appends computed columns to each row.
 
-The data component evaluates each Expr against the current row and adds the
-result as a new column. The schema component is `Extend({name: dtype, ...})`
-where dtype is inferred from the expression's type information.
+The data component evaluates each Expr against the **original** input row and
+adds the result as a new column. Derived columns SHALL NOT reference other
+columns being derived in the same `derive()` call — all expressions are
+evaluated against the row as it existed before the derive step. To chain
+derived columns, use separate `derive()` calls.
+
+The schema component is `Extend({name: dtype, ...})` where dtype is inferred
+from the expression's result type inference (see `expression/spec.md`).
 
 #### Scenario: Add a single computed column
 

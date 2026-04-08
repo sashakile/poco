@@ -20,7 +20,7 @@ Goals:
 - Clean pipe syntax via `|` operator
 - Schema as dataclass with descriptor-based `Expr` on class access
 - Pipeline steps as product category: (data transform, schema transform)
-- Swappable Storage and Compute backends via protocols
+- Swappable Storage and Compute backends via protocols (future change, not in this proposal)
 
 Non-Goals:
 - Feature parity with pandas
@@ -131,10 +131,12 @@ Alternatives considered:
 - `Person.age + 1` → `BinOp(ADD, ColumnRef("age"), Literal(1))`
 
 For joins, the project intentionally narrows the supported predicate language
-to conjunctions of equalities. In `left_expr == right_expr`, the left subtree
-is evaluated against the left row and the right subtree against the right row.
-This avoids inventing a separate two-table expression hierarchy while still
-supporting multi-column joins and self-joins.
+to conjunctions of **column-reference equalities** only. In
+`LeftSchema.col == RightSchema.col`, the left ColumnRef is evaluated against
+the left row and the right ColumnRef against the right row. Computed
+expressions in join predicates are rejected with a `TypeError`. This avoids
+inventing a separate two-table expression hierarchy while keeping join
+semantics simple and unambiguous for a teaching library.
 
 `Expr` implements:
 - Comparison: `__gt__`, `__lt__`, `__ge__`, `__le__`, `__eq__`, `__ne__`
@@ -225,23 +227,32 @@ transducer. This completes the monoid structure.
 
 ### Pipeline steps as product category
 
-A pipeline step is a pair `(data_transform, schema_transform)`:
+A pipeline step is a pair `(data_op, schema_transform)`:
 
 ```python
-PipelineStep = (data: Transducer, schema: SchemaTransform)
+PipelineStep = (data: DataOp, schema: SchemaTransform)
 ```
 
-- `where(expr)`: data=filtering by expr, schema=identity (columns unchanged)
-- `select(*cols)`: data=column dropper, schema=projection to selected columns
-- `mapping(fn)`: data=mapping by fn, schema=identity (row shape unchanged)
+`DataOp` is either:
+- `StreamingOp` — backed by a transducer (processes rows one at a time)
+- `MaterializingOp` — requires all input rows before producing output
+
+- `where(expr)`: data=StreamingOp(filtering by expr), schema=identity
+- `select(*cols)`: data=StreamingOp(column dropper), schema=projection
+- `sort_by(*exprs)`: data=MaterializingOp(sort), schema=identity
+- `groupby(...)`: data=MaterializingOp(group-aggregate), schema=GroupBy
 
 Composition is component-wise:
 ```
 (d1, s1) | (d2, s2) = (d1 | d2, s1 ∘ s2)
 ```
 
+When composing, if either data component is materializing, the result is
+materializing (the collection boundary is preserved).
+
 Both components compose independently in their own category:
-- Data transforms: transducer monoid (associative, has identity)
+- Data ops: streaming ops compose via transducer monoid; materializing ops
+  create collection boundaries
 - Schema transforms: function composition (associative, has identity)
 
 **Why a product category**: `select` does two things — transforms rows AND
@@ -291,7 +302,7 @@ Two layers of transducer API:
 
 **High-level** (work with `Expr` objects, user-facing):
 - `where(expr)` — wraps `filtering` with Expr evaluation per row
-- `select(*exprs)` — project operation from column references
+- `select(*column_refs)` — project operation from ColumnRef expressions only
 - `derive(**named_exprs)` — add computed columns from Expr evaluation
 - `sort_by(*exprs, descending=)` — reorder rows (materializing step)
 - `distinct(*exprs)` — remove duplicate rows
@@ -359,7 +370,7 @@ wrappers.
 All public API SHALL be importable via `from poco import po`. Internal
 implementation uses submodules with leading underscore, re-exported through
 `poco/po.py`:
-- `poco/_expr.py` — Expr, ColumnRef, Literal, BinOp, UnaryOp
+- `poco/_expr.py` — Expr, ColumnRef, Literal, BinOp, UnaryOp, required_columns, result type inference
 - `poco/_schema.py` — schema decorator, ColumnDescriptor, inference
 - `poco/_reduce.py` — Reducer protocol, Reduced, reduce(), built-in reducers
 - `poco/_transducer.py` — Transducer protocol, filtering, mapping, taking, dropping, comp
@@ -389,12 +400,12 @@ po.DataFrame        # constructor (from dict or rows, optional schema=)
 
 # High-level operations (Expr-based, produce PipelineSteps)
 po.where(expr)      # filtering step (schema=identity)
-po.select(*exprs)   # project step (schema=projection)
+po.select(*column_refs)  # project step, ColumnRef only (schema=projection)
 po.derive(**exprs)  # add columns step (schema=extend)
 po.sort_by(*exprs, descending=)  # ordering step (materializing, schema=identity)
 po.distinct(*exprs) # dedup step (schema=identity)
 po.groupby(*keys, **aggs)  # group-aggregate step (schema=GroupBy)
-po.join(left, right, on=, how=)  # relational join (returns lazy DataFrame)
+po.join(left, right, on=, how=, suffixes=)  # relational join (returns lazy DataFrame)
 
 # Low-level transducers (callable-based)
 po.filtering(pred)  # filter transducer
@@ -406,6 +417,14 @@ po.comp(first=, second=)  # compose left-to-right (identity if no args)
 # Reduce
 po.reduce(reducer, df, transducer=None)  # apply reducer, forces collection
 
+# Built-in reducers
+po.to_list          # collect all items into a list
+po.count            # count items (0 on empty)
+po.sum_reducer      # sum items (0 on empty)
+po.mean             # arithmetic mean (ValueError on empty)
+po.min_reducer      # minimum (ValueError on empty)
+po.max_reducer      # maximum (ValueError on empty)
+
 # Column-bound reducers (for groupby aggregations)
 po.sum_of(expr)     # extract column, sum values
 po.mean_of(expr)    # extract column, compute mean
@@ -416,9 +435,11 @@ po.count_of()       # count rows
 # Classes / types (for type hints and isinstance checks)
 po.Expr             # expression base type
 # methods: .equals(other), .is_null(), .fill_null(default)
+# properties: .required_columns, .result_type
 po.Reducer          # reducer protocol
 po.Transducer       # transducer protocol
-po.PipelineStep     # (data_transform, schema_transform) pair
+po.PipelineStep     # (data_op, schema_transform) pair
+po.DataOp           # data operation (StreamingOp | MaterializingOp)
 po.SchemaTransform  # schema transformation (Identity, Project, GroupBy, Extend)
 po.Reduced          # early termination sentinel
 po.SchemaError      # schema validation error

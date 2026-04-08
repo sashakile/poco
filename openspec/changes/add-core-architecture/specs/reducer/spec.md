@@ -96,3 +96,28 @@ The system SHALL provide these built-in reducers:
 
 - **WHEN** `po.reduce(po.min_reducer, [])` is called
 - **THEN** the system SHALL raise a `ValueError`
+
+#### Scenario: max_reducer on empty raises error
+
+- **WHEN** `po.reduce(po.max_reducer, [])` is called
+- **THEN** the system SHALL raise a `ValueError`
+
+#### Scenario: mean on empty raises error
+
+- **WHEN** `po.reduce(po.mean, [])` is called
+- **THEN** the system SHALL raise a `ValueError`
+
+#### Scenario: sum_reducer on empty returns zero
+
+- **WHEN** `po.reduce(po.sum_reducer, [])` is called
+- **THEN** the result SHALL be `0`
+
+#### Scenario: count on empty returns zero
+
+- **WHEN** `po.reduce(po.count, [])` is called
+- **THEN** the result SHALL be `0`
+
+#### Scenario: to_list on empty returns empty list
+
+- **WHEN** `po.reduce(po.to_list, [])` is called
+- **THEN** the result SHALL be `[]`
