@@ -250,6 +250,12 @@ column names referenced by the expression tree.
 operations such as `derive`. The following rules SHALL apply for supported
 scalar types (`int`, `float`, `str`, `bool`):
 
+For static result-type inference, `Optional[T]` SHALL be treated as `T`.
+Nullability does not widen the inferred result type by itself. Runtime
+evaluation semantics are unchanged: if an operator receives `None` at runtime
+and the expression was not normalized explicitly with `fill_null()` or checked
+with `is_null()`, evaluation SHALL raise `NullValueError`.
+
 **Arithmetic operators** (`+`, `-`, `*`, `/`):
 - `int op int` → `int` (except `/` which always produces `float`)
 - `int op float` or `float op int` → `float`
@@ -290,3 +296,13 @@ message suggesting explicit type annotation.
 
 - **WHEN** `Person.age.fill_null(0)` where `age: int | None`
 - **THEN** the inferred result type SHALL be `int`
+
+#### Scenario: Arithmetic inference ignores nullable wrapper
+
+- **WHEN** `Person.age + Literal(1)` where `age: int | None`
+- **THEN** the inferred result type SHALL be `int`
+
+#### Scenario: Comparison inference ignores nullable wrapper
+
+- **WHEN** `Person.age > Literal(30)` where `age: int | None`
+- **THEN** the inferred result type SHALL be `bool`

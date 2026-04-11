@@ -63,7 +63,7 @@ Boundary rules:
 Allowed normative references:
 - `expression` MAY reference `row-model` and `schema`
 - `transducer` MAY reference `reducer`
-- `pipeline` MAY reference `expression`, `transducer`, and `dataframe`
+- `pipeline` MAY reference `expression` and `transducer`
 - `dataframe` MAY reference `pipeline`, `aggregation`, `schema`, and `row-model`
 - `relational` MAY reference `pipeline`, `aggregation`, `expression`, and `dataframe`
 

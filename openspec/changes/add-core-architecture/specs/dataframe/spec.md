@@ -393,8 +393,8 @@ An optional `transducer` keyword parameter accepts either a `Transducer` or a
 used as the reducer wrapper.
 
 **Constraint Boundary:** Only streaming transducers and streaming pipeline steps
-(e.g., `where`, `select`) are valid in the `transducer=` parameter.
-Materializing pipeline steps (e.g., `sort_by`, `distinct` on certain columns)
+(e.g., `where`, `select`, `distinct`) are valid in the `transducer=` parameter.
+Materializing pipeline steps (e.g., `sort_by`, `groupby`)
 SHALL raise a `TypeError` when passed as a `transducer=` argument. However,
 the source `df` itself MAY contain any number of materializing steps in its
 plan; `po.reduce` SHALL execute that plan fully before applying the final

@@ -206,8 +206,11 @@ step SHALL be materializing (the collection boundary is preserved).
 `SchemaTransform` SHALL be a sealed type hierarchy (`Identity`, `Project`,
 `GroupBy`, `Extend`; future variants include `Rename`). All code matching on
 `SchemaTransform` variants SHALL handle every variant explicitly. Python
-implementations SHALL use `typing.assert_never()` in the default/else branch
-to ensure type-checker enforcement when new variants are added.
+implementations SHALL include an explicit unreachable default branch. When
+static type-checking is configured, implementations SHOULD use
+`typing.assert_never()` in that branch. Regardless of toolchain, the test suite
+SHALL exercise every current `SchemaTransform` variant and verify that an
+unsupported runtime variant raises an assertion-style error naming the variant.
 
 `Extend(new_columns: dict[str, type])` represents adding computed columns.
 It preserves all input columns and adds the named columns with their types.
@@ -216,7 +219,8 @@ It preserves all input columns and adds the named columns with their types.
 
 - **WHEN** a new `SchemaTransform` variant is added (e.g., `Extend` or `Rename`)
 - **THEN** any code that matches on `SchemaTransform` variants without handling
-  the new variant SHALL produce a type error detectable by mypy/pyright
+  the new variant SHALL fail either in static analysis (when configured) or in
+  the runtime exhaustiveness test for unsupported variants
 
 ### Requirement: comp composes left-to-right with named parameters
 
@@ -252,8 +256,9 @@ The `descending` parameter SHALL accept:
 
 `sort_by` is a **materializing** pipeline step: it requires all input rows
 before producing any output. This is in contrast to streaming steps like
-`where` and `select` whose data components are transducers. The pipeline
-executor SHALL handle this collection boundary transparently.
+`where` and `select` whose data components are transducers. When a plan reaches
+`sort_by`, the executor SHALL fully realize that step's input rows before
+passing sorted rows to downstream steps.
 
 Schema transform: `Identity` (columns unchanged, only row order changes).
 

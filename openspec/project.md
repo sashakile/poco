@@ -27,7 +27,7 @@ Goals:
 ### Code Style
 
 - Strict error handling: raise early on bad column names, type mismatches. No silent coercion.
-- Symbolic column accessors (`_.col`), no string-based column references
+- Schema-bound column accessors (`Person.age`), no string-based column references
 - Pipe composition via `|` operator for clean data pipelines
 - Bilingual documentation (Spanish and English), pure markdown
 
