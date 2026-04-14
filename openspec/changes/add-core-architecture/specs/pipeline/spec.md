@@ -470,3 +470,212 @@ only passes through rows whose key has not been seen before. Schema transform:
 - **WHEN** `po.distinct()` is applied to a DataFrame with columns `name`, `age`
 - **THEN** rows are compared on all columns — `required_columns` SHALL be empty
   (schema validation bypassed; all columns are used at collection time)
+
+### [ARCH-004] Requirement: Schema validation checks column existence only
+
+Schema validation at pipe time (`DataFrame | step`) verifies that all columns
+in the step's `required_columns` exist in the current schema. It does NOT
+verify type compatibility at pipe time.
+
+Type errors (e.g., `Person.age > 30` where age is str) are detected at
+materialization time when expressions are evaluated against actual row values.
+This is because type inference is best-effort and some type errors can only be
+detected with concrete data.
+
+#### Scenario: Type mismatch detected at materialization
+
+- **WHEN** df has column "age" with type str
+- **AND** `df | po.where(Person.age > 30)` is piped
+- **THEN** no error SHALL be raised at pipe time (column "age" exists)
+- **AND** at materialization, `TypeError` SHALL be raised when comparing str
+  to int
+
+### [FORM-004] Requirement: Materializing steps act as collection boundaries
+
+A materializing step (`sort_by`, `groupby`) acts as a collection boundary
+within a pipeline. Data streams through preceding streaming steps into the
+materializing step's internal buffer. After the materializing step completes
+(e.g., sorting), its output streams through subsequent streaming steps.
+
+In a pipeline `streaming₁ | materializing | streaming₂`:
+1. `streaming₁` processes rows one-at-a-time into materializing's buffer
+2. `materializing` collects all rows, performs its operation (e.g., sort)
+3. `materializing`'s output streams one-at-a-time through `streaming₂`
+
+Multiple materializing steps in a pipeline create multiple collection
+boundaries. Each materializing step fully collects and processes before the
+next segment begins.
+
+#### Scenario: Filter-sort-filter pipeline
+
+- **WHEN** `df | po.where(age > 20) | po.sort_by(Person.age) | po.where(age < 50)`
+  is materialized
+- **THEN** `where(age > 20)` SHALL stream into `sort_by`'s buffer, `sort_by`
+  SHALL sort, and sorted rows SHALL stream through `where(age < 50)`
+
+### [ARCH-008 / FORM-005] Requirement: SchemaTransform composition is defined for all valid pairs
+
+All pairwise compositions of `SchemaTransform` variants are either valid
+(producing a well-defined result) or explicitly invalid (raising `SchemaError`
+at composition time).
+
+| First ∘ Second | Identity | Project | Extend | GroupBy |
+|---|---|---|---|---|
+| Identity | Identity | Project | Extend | GroupBy |
+| Project | Project | Project (intersected) | Extend (if projected cols available) | GroupBy (if keys in projected cols) |
+| Extend | Extend (original+new, then second) | Project (from extended set) | Extend (merged new columns; SchemaError on name conflict) | GroupBy (from extended set) |
+| GroupBy | GroupBy | Project (from groupby output cols) | Extend (add to groupby output) | SchemaError: "Cannot compose two GroupBy steps; combine into single groupby call" |
+
+Validation: at composition time, if the second step's required columns are not
+in the first step's output columns, `SchemaError` SHALL be raised.
+
+#### Scenario: GroupBy composed with GroupBy
+
+- **WHEN** `step1 = po.groupby(Person.dept, total=po.sum_of(Person.salary))`
+- **AND** `step2 = po.groupby(other_key, ...)`
+- **AND** `step1 | step2` is composed
+- **THEN** `SchemaError` SHALL be raised: "Cannot compose two GroupBy steps;
+  combine into single groupby call"
+
+### [BIZ-013] Requirement: select with duplicate ColumnRefs deduplicates silently
+
+`po.select(Person.name, Person.age, Person.name)` deduplicates to
+`po.select(Person.name, Person.age)`. The first occurrence determines
+position. No error SHALL be raised.
+
+Rationale: deduplication is the least surprising behavior and avoids invalid
+schemas with duplicate columns.
+
+#### Scenario: Duplicate columns in select
+
+- **WHEN** `po.select(Person.name, Person.age, Person.name)` is constructed
+- **THEN** the schema SHALL be `Project(["name", "age"])` — deduplicated,
+  first-occurrence order
+
+### [BIZ-014] Requirement: Composing multiple sort_by steps applies sorts sequentially
+
+Each `sort_by` step is a full independent sort. Composing
+`sort_by(A) | sort_by(B)` sorts by A first (materializing), then re-sorts
+by B (materializing again), discarding A's ordering.
+
+To sort by multiple keys, use a single `sort_by` call: `sort_by(B, A)`.
+
+#### Scenario: Chained sort_by steps
+
+- **WHEN** `df | po.sort_by(Person.age) | po.sort_by(Person.name)` is
+  materialized
+- **THEN** the result SHALL be sorted by name only (age sort is discarded
+  by re-sort)
+
+### [MATH-005] Requirement: sort_by validates parameters in order
+
+`sort_by` SHALL validate parameters in this order:
+1. At least one expression required — `ValueError` if no expressions provided
+2. Expressions must be valid `Expr` — `TypeError` if non-Expr argument
+3. If `descending` is a list, its length must match the number of expressions
+   — `ValueError` on mismatch
+
+#### Scenario: No expressions with descending list
+
+- **WHEN** `po.sort_by(descending=[True])` is called
+- **THEN** `ValueError` SHALL be raised: "sort_by requires at least one
+  expression" (checked before descending)
+
+### [MATH-012] Requirement: taking and dropping accept non-negative integers
+
+- `taking(0)`: valid, immediately produces Reduced on first item, yielding
+  empty output
+- `dropping(0)`: valid, passes all items through unchanged (identity behavior)
+- `taking(n)` / `dropping(n)` where n < 0: `ValueError`: "n must be
+  non-negative"
+- Large values (e.g., `taking(10**18)`): valid, effectively passes all items
+  if input is smaller
+
+#### Scenario: taking zero
+
+- **WHEN** `xf = po.taking(0)` is applied to `[1, 2, 3]`
+- **THEN** the result SHALL be `[]` (empty)
+
+#### Scenario: dropping zero
+
+- **WHEN** `xf = po.dropping(0)` is applied to `[1, 2, 3]`
+- **THEN** the result SHALL be `[1, 2, 3]` (all items)
+
+#### Scenario: Negative taking
+
+- **WHEN** `po.taking(-1)` is called
+- **THEN** `ValueError` SHALL be raised: "n must be non-negative"
+
+### [HUM-004] Requirement: DataFrame | Expr raises TypeError with guidance
+
+`DataFrame | Expr` SHALL raise `TypeError` with message: "Cannot pipe Expr
+directly to DataFrame. Use po.where(expr) for filtering or po.select(expr)
+for column selection."
+
+This prevents confusion between `|` as boolean OR on Expr and `|` as pipe
+on DataFrame.
+
+#### Scenario: Bare Expr piped to DataFrame
+
+- **WHEN** `df = po.DataFrame(data)` and `expr = Person.age > 30`
+- **AND** developer writes `df | expr`
+- **THEN** `TypeError` SHALL be raised: "Cannot pipe Expr directly to
+  DataFrame. Use po.where(expr) for filtering or po.select(expr) for column
+  selection."
+
+### [HUM-005] Requirement: derive error message suggests chaining for cross-references
+
+When `derive` raises `SchemaError` because a derived column name references
+another column being derived in the same call, the error message SHALL suggest
+chaining separate `derive()` calls.
+
+#### Scenario: Derived column references sibling derivation
+
+- **WHEN** df has no column "bonus"
+- **AND** `df | po.derive(bonus=Person.salary * 0.1, tax=ColumnRef("bonus") * 0.3)`
+  is evaluated
+- **THEN** `SchemaError` or `ColumnNotFoundError` SHALL be raised: "Column
+  'bonus' not found. Note: derived columns in the same derive() call cannot
+  reference each other. Chain separate derive() calls:
+  `df | po.derive(bonus=...) | po.derive(tax=schema.bonus * 0.3)`"
+
+### [HUM-006] Requirement: reduce TypeError for materializing transducer includes guidance
+
+When `po.reduce(reducer, df, transducer=materializing_step)` raises
+`TypeError`, the error message SHALL explain why and suggest the alternative.
+
+#### Scenario: sort_by as transducer wrapper
+
+- **WHEN** `po.reduce(po.count, df, transducer=po.sort_by(Person.age))` is
+  called
+- **THEN** `TypeError` SHALL be raised: "sort_by is a materializing step and
+  cannot be used as a transducer wrapper in po.reduce(). Materializing steps
+  require collecting all data before processing, which is incompatible with
+  streaming reduction. Move it into the DataFrame pipeline instead:
+  po.reduce(po.count, df | po.sort_by(Person.age))"
+
+### [BIZ-006] Requirement: derive SchemaError on column conflict includes recovery guidance
+
+When `derive` detects a column name conflict with an existing column, the
+`SchemaError` message SHALL include a recovery path.
+
+#### Scenario: derive with existing column name
+
+- **WHEN** df has column "salary"
+- **AND** `df | po.derive(salary=Person.salary * 1.1)` is evaluated
+- **THEN** `SchemaError` SHALL be raised: "Column 'salary' already exists. To
+  replace a column, first drop it with po.select() then add it with
+  po.derive(): `df | po.select(Person.name, ...) | po.derive(salary=Person.salary * 1.1)`"
+
+### [MATH-011] Requirement: derive accepts Literal-only expressions
+
+`po.derive(constant=Literal(42))` SHALL be valid. The expression has empty
+`required_columns`, so schema validation always passes. At materialization,
+the `Literal` evaluates to its value for every row.
+
+#### Scenario: Constant column via Literal
+
+- **WHEN** `df | po.derive(flag=Literal(True))` is applied to a DataFrame
+  with 3 rows
+- **THEN** the result SHALL have 3 rows, each with `flag=True`
+- **AND** derived column "flag" SHALL have type `bool`

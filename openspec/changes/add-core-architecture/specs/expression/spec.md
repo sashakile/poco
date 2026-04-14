@@ -306,3 +306,171 @@ message suggesting explicit type annotation.
 
 - **WHEN** `Person.age > Literal(30)` where `age: int | None`
 - **THEN** the inferred result type SHALL be `bool`
+
+### Requirement: Expr raises TypeError in boolean context
+
+Expr defines `__bool__` to raise TypeError. Using an Expr in a boolean
+context (`if`, `and`, `or`, `not`, `assert`) raises TypeError with message:
+"Expr cannot be used as bool. Use .equals(other) for structural comparison,
+or po.where(expr) for filtering."
+
+#### Scenario: Expr used in if statement
+
+- **GIVEN** `Person.age` is an Expr via `@po.schema` descriptor
+- **WHEN** developer writes `if Person.age == 30: ...`
+- **THEN** TypeError is raised: "Expr cannot be used as bool. Use .equals(other)
+  for structural comparison, or po.where(expr) for filtering."
+
+#### Scenario: Expr used in assert
+
+- **GIVEN** `expr = Person.age > 25`
+- **WHEN** developer writes `assert expr`
+- **THEN** TypeError is raised with same message
+
+### Requirement: Unhashable Expr error includes guidance
+
+When Expr is used in a hash-requiring context (dict key, set member), Python
+raises TypeError: "unhashable type". `Expr.__hash__ = None` produces this
+naturally. Documentation and error guidance should note: "Expr is unhashable.
+Use column name strings as dict keys or set members instead."
+
+#### Scenario: Expr as dict key
+
+- **GIVEN** `Person.age` is an Expr
+- **WHEN** developer writes `{Person.age: "alias"}`
+- **THEN** TypeError is raised (Python standard unhashable error)
+
+### Requirement: Boolean Expr operators do not short-circuit
+
+Boolean operators `&`, `|`, and `~` on Expr build AST nodes. Both operands
+of `&` and `|` are always evaluated at materialization time. There is no
+short-circuit evaluation.
+
+This means `(Person.age > 0) & (Person.salary / Person.age > 1000)` will
+raise ZeroDivisionError when age is 0, even though the left operand is
+False. To guard against this, use nested `where()` steps or `fill_null()`.
+
+#### Scenario: Division by zero despite false guard
+
+- **GIVEN** `row = {"age": 0, "salary": 50000}`
+- **WHEN** `(Person.age > 0) & (Person.salary / Person.age > 1000)` is
+  evaluated against row
+- **THEN** ZeroDivisionError is raised (no short-circuit)
+
+#### Scenario: Safe guard via chained where
+
+- **GIVEN** `row = {"age": 0, "salary": 50000}`
+- **WHEN** developer writes
+  `df | po.where(Person.age > 0) | po.where(Person.salary / Person.age > 1000)`
+- **THEN** the first `where` filters out age=0 rows before the second `where`
+  evaluates
+
+### Requirement: NaN behavior in expression evaluation
+
+`float("nan")` is a valid float column value (not treated as `None`). NaN
+follows IEEE 754 semantics in expression evaluation:
+
+- Comparison: NaN compared to any value (including NaN) returns False,
+  except `!=` which returns True
+- Arithmetic: any arithmetic involving NaN produces NaN
+- `expr.is_null()` on NaN returns False (NaN is not None)
+- `expr.fill_null(default)` on NaN returns NaN (NaN is not None)
+
+NaN in specific operations (defined in respective specs):
+- `sort_by`: NaN sorts after all non-NaN values (last in ascending, first
+  in descending)
+- `distinct`: each NaN is treated as unique (NaN != NaN per IEEE 754, no
+  deduplication)
+- `groupby`: each NaN key forms its own group (NaN != NaN)
+
+#### Scenario: NaN in comparison
+
+- **GIVEN** `row = {"age": float("nan")}`
+- **WHEN** `Person.age > 30` is evaluated
+- **THEN** result is False (IEEE 754)
+
+#### Scenario: NaN equality
+
+- **GIVEN** `row = {"age": float("nan")}`
+- **WHEN** `Person.age == Person.age` is evaluated
+- **THEN** result is False (NaN != NaN per IEEE 754)
+
+#### Scenario: NaN is not null
+
+- **GIVEN** `row = {"age": float("nan")}`
+- **WHEN** `Person.age.is_null()` is evaluated
+- **THEN** result is False
+
+### Requirement: Complete expression type inference decision table
+
+Expression result type inference covers all supported type combinations.
+The following table defines the result type for each operator class.
+Combinations marked SchemaError are rejected at pipeline construction time.
+
+**Arithmetic operators** (`+`, `-`, `*`, `//`):
+
+| Left \\ Right | bool | int | float | str |
+|---|---|---|---|---|
+| bool | int | int | float | SchemaError |
+| int | int | int | float | SchemaError |
+| float | float | float | float | SchemaError |
+| str | SchemaError | SchemaError | SchemaError | SchemaError |
+
+Exception: `str + str` → `str` (concatenation). All other str arithmetic →
+SchemaError.
+Exception: `/` (true division) always returns `float`, even for `int / int`.
+
+Note: `bool` is promoted to `int` for arithmetic (Python semantics:
+`True + True → 2`). `str * int` (Python repetition) is NOT supported — use
+explicit string operations.
+
+**Comparison operators** (`>`, `<`, `>=`, `<=`, `==`, `!=`):
+
+| Left \\ Right | bool | int | float | str |
+|---|---|---|---|---|
+| bool | bool | bool | bool | SchemaError |
+| int | bool | bool | bool | SchemaError |
+| float | bool | bool | bool | SchemaError |
+| str | SchemaError | SchemaError | SchemaError | bool |
+
+Numeric types (`bool`, `int`, `float`) are mutually comparable. `str` is
+only comparable to `str`. Cross-family comparisons raise SchemaError.
+
+**Boolean operators** (`&`, `|`):
+
+| Left \\ Right | bool | int | float | str |
+|---|---|---|---|---|
+| bool | bool | SchemaError | SchemaError | SchemaError |
+| int | SchemaError | SchemaError | SchemaError | SchemaError |
+| float | SchemaError | SchemaError | SchemaError | SchemaError |
+| str | SchemaError | SchemaError | SchemaError | SchemaError |
+
+Boolean operators require both operands to be `bool`. `~` (unary NOT)
+requires `bool` operand.
+
+**Nullability**: `Optional[T]` is treated as `T` for type inference purposes.
+Nullability does not widen the result type. Each operand with `Optional` type
+must be independently handled via `fill_null()` or filtered via
+`where(expr.is_null())` before use in operations that would raise
+`NullValueError`.
+
+### Requirement: fill_null applies per-expression in binary operations
+
+In a binary expression with two `Optional` operands, each operand must be
+independently handled with `fill_null()`. `fill_null` on one side does not
+affect the other side.
+
+#### Scenario: Both operands Optional, only one filled
+
+- **GIVEN** `age: int | None`, `salary: int | None`
+- **WHEN** `Person.age.fill_null(0) + Person.salary` is evaluated against
+  `{"age": None, "salary": None}`
+- **THEN** NullValueError is raised for salary (`fill_null` on age does not
+  affect salary)
+
+#### Scenario: Both operands filled
+
+- **GIVEN** `age: int | None`, `salary: int | None`
+- **WHEN** `Person.age.fill_null(0) + Person.salary.fill_null(0)` is evaluated
+  against `{"age": None, "salary": None}`
+- **THEN** result is `0` (both filled)

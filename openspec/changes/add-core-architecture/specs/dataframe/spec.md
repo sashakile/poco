@@ -434,3 +434,200 @@ produce auto-generated schemas; their rules are defined in `relational/spec.md`.
 
 - **WHEN** `df2 = df | po.select(Person.name, Person.age)`
 - **THEN** `df2.schema` SHALL expose only `name` and `age`
+
+### [ARCH-001] Requirement: DataFrame defensively copies input data at construction time
+
+DataFrame construction SHALL shallow-copy the input data structure (dict-of-lists
+or list-of-dicts). Mutations to the original data source after construction
+SHALL NOT affect the DataFrame.
+
+- Dict-of-lists: each list is shallow-copied
+- List-of-dicts: the outer list is shallow-copied; individual dicts are
+  shallow-copied when yielded as rows
+
+This ensures that the "no internal cache, re-execute plan" model produces
+consistent results even if the user mutates the original data.
+
+#### Scenario: Mutating source list after construction
+
+- **GIVEN** `data = {"x": [1, 2, 3]}`
+- **AND** `df = po.DataFrame(data)`
+- **WHEN** `data["x"].append(4)`
+- **THEN** `list(df)` SHALL still yield `[{"x": 1}, {"x": 2}, {"x": 3}]`
+  (3 rows, not 4)
+
+#### Scenario: Mutating source dict after construction
+
+- **GIVEN** `data = {"x": [1, 2]}`
+- **AND** `df = po.DataFrame(data)`
+- **WHEN** `data["y"] = [3, 4]`
+- **THEN** `df.columns` SHALL be `["x"]` (no `"y"` column)
+
+### [ARCH-003] Requirement: poco types are not thread-safe
+
+poco types (`DataFrame`, `Reducer`, `Transducer`, `PipelineStep`) are not
+thread-safe. Concurrent access to the same mutable state produces undefined
+behavior.
+
+However, concurrent materialization of the same DataFrame is safe because
+materialization creates fresh transducer state per execution (see FORM-003
+requirement). Two threads calling `list(df)` on the same DataFrame SHALL each
+get correct, independent results, as long as the underlying data source is not
+being mutated concurrently.
+
+Concurrent mutations to the data source during materialization produce
+undefined behavior.
+
+### [FORM-003] Requirement: Transducer wrapping occurs at materialization time, not plan construction time
+
+When a pipeline step containing a transducer is appended to a DataFrame via
+`|`, the transducer SHALL be stored as a value in the plan. Wrapping (applying
+the transducer to a reducer) SHALL occur at materialization time (`iter`,
+`len`, `repr`, `collect()`).
+
+Each materialization trigger SHALL create a fresh transducer chain with
+independent state. This ensures:
+- Repeated materialization of the same DataFrame produces identical results
+  for deterministic pipelines
+- Concurrent materialization of the same DataFrame is safe (no shared
+  mutable state)
+- Stateful transducers (`taking`, `dropping`, `distinct`) get fresh
+  counters/sets per execution
+
+#### Scenario: Repeated materialization with stateful transducer
+
+- **GIVEN** `df = po.DataFrame({"x": [1,2,3,4,5]}) | po.taking(2)`
+- **WHEN** `result1 = list(df)` and `result2 = list(df)` are called sequentially
+- **THEN** `result1 == result2 == [{"x": 1}, {"x": 2}]`
+
+#### Scenario: Concurrent materialization safety
+
+- **GIVEN** `df = po.DataFrame(data) | po.taking(3)`
+- **WHEN** two threads both call `list(df)` concurrently
+- **THEN** both threads SHALL get correct 3-element results (independent state)
+
+### [ARCH-007] Requirement: po.reduce accepts DataFrame or Iterable as collection
+
+`po.reduce(reducer, collection)` SHALL accept:
+- `DataFrame`: materialized via iteration, reducer applied to yielded rows
+- Any `Iterable[dict[str, object]]`: reducer applied to items from the iterable
+
+Generators and iterators are consumed on first use. Subsequent `po.reduce`
+calls on the same exhausted generator/iterator SHALL produce the empty-input
+result.
+
+#### Scenario: Reduce on list of dicts
+
+- **GIVEN** `data = [{"x": 1}, {"x": 2}]`
+- **WHEN** `po.reduce(po.count, data)` is called
+- **THEN** the result SHALL be `2`
+
+#### Scenario: Reduce on exhausted generator
+
+- **GIVEN** `gen = (row for row in [{"x": 1}])`
+- **AND** `po.reduce(po.count, gen)` returns `1`
+- **WHEN** `po.reduce(po.count, gen)` is called again
+- **THEN** the result SHALL be `0` (generator exhausted)
+
+### [HUM-003] Requirement: DataFrame documents re-execution behavior
+
+Each materialization trigger (`repr`, `_repr_html_`, `iter`, `len`,
+`collect()`) SHALL re-execute the entire pipeline plan from the data source.
+There SHALL be no internal caching.
+
+To avoid redundant execution, call `collect()` to obtain a materialized
+DataFrame with inline data and an empty plan. Subsequent operations on the
+collected DataFrame SHALL NOT re-execute the original plan.
+
+#### Scenario: Collect avoids re-execution
+
+- **GIVEN** `df = po.DataFrame(data) | expensive_pipeline`
+- **AND** `collected = df.collect()`
+- **WHEN** `repr(collected)` and `list(collected)` are called
+- **THEN** the `expensive_pipeline` SHALL NOT be re-executed (data is inline
+  in `collected`)
+
+### [BIZ-007] Requirement: Empty DataFrame construction behavior matrix
+
+| Input | Schema Provided? | Result |
+|---|---|---|
+| `{}` | No | Valid: 0 columns, 0 rows |
+| `{}` | Yes | SchemaError: data has 0 columns but schema declares N columns |
+| `[]` | No | Valid: 0 columns, 0 rows |
+| `[]` | Yes | Valid: 0 rows, schema's columns with no data |
+| `{"a": []}` | No | SchemaError: cannot infer type for empty column "a" |
+| `{"a": []}` | Yes (with col a) | Valid: 1 column, 0 rows |
+| `{"a": []}` | Yes (with cols a,b) | SchemaError: missing column "b" in data |
+| Filter removes all | N/A | Valid: 0 rows, original schema preserved |
+| `head(0)` | N/A | Valid: 0 rows, original schema preserved |
+
+#### Scenario: Empty dict with schema
+
+- **GIVEN** `@po.schema class S: a: int`
+- **WHEN** `po.DataFrame({}, schema=S)` is constructed
+- **THEN** the system SHALL raise a `SchemaError`: "Data has 0 columns but
+  schema declares 1 column"
+
+#### Scenario: Empty list with schema
+
+- **GIVEN** `@po.schema class S: a: int`
+- **WHEN** `po.DataFrame([], schema=S)` is constructed
+- **THEN** a valid DataFrame with 0 rows and columns `["a"]` SHALL be created
+
+### [FAIL-003] Requirement: Auto-generated schemas are structurally compared
+
+Auto-generated schema classes (produced by `select`, `derive`, `groupby`,
+`join`) are created per operation, not cached. Two auto-generated schemas with
+the same columns and types are structurally equivalent but MAY be different
+class objects.
+
+Schema comparison SHALL use structural equality (same field names, same field
+types, same order), not class identity (`is`). Code SHALL NOT use `isinstance`
+checks with auto-generated schemas.
+
+#### Scenario: Two selects producing same schema
+
+- **GIVEN** `df1 = df | po.select(Person.name)` and
+  `df2 = df | po.select(Person.name)`
+- **WHEN** `df1.schema` and `df2.schema` are compared
+- **THEN** they SHALL be structurally equivalent (same columns, same types)
+- **BUT** `df1.schema` is not necessarily `df2.schema` (different class objects)
+
+### [FAIL-004] Requirement: Pipeline execution uses iterative transducer application
+
+Pipeline execution SHALL apply transducers iteratively (not recursively) to
+avoid stack overflow on deeply composed pipelines. A pipeline of N streaming
+steps wraps the inner reducer N times, but the wrapping itself SHALL be
+iterative.
+
+No fixed pipeline depth limit SHALL be imposed, but deeply composed pipelines
+with many materializing steps incur proportional memory and computation costs.
+
+### [HUM-008 / FAIL-007] Requirement: Materialization errors include pipeline context
+
+When an error occurs during materialization (`NullValueError`,
+`ZeroDivisionError`, `TypeError`, etc.), the exception SHALL include context
+about which pipeline step caused the error, the step's position in the plan,
+and (where available) the row index being processed.
+
+#### Scenario: NullValueError with context
+
+- **GIVEN** `df | po.where(Person.age > 30) | po.derive(bonus=Person.salary * 0.1)`
+- **WHEN** materialization encounters a `None` salary in the derive step
+- **THEN** the `NullValueError` SHALL include: "Error in pipeline step 2
+  (derive) at row 5: column 'salary' is None"
+
+### [HUM-008 / FAIL-007] Requirement: Pipeline steps validate Expr types at construction
+
+High-level pipeline step constructors (`where`, `select`, `derive`, `sort_by`,
+`distinct`, `groupby`) SHALL validate that their arguments are `Expr` instances
+at construction time. Non-`Expr` arguments SHALL raise `TypeError` with
+guidance.
+
+#### Scenario: where receives bool instead of Expr
+
+- **GIVEN** `person = Person(name="Alice", age=35)`
+- **WHEN** `po.where(person.age > 30)` is called (`person.age > 30` evaluates
+  to `True`, a `bool`)
+- **THEN** the system SHALL raise a `TypeError`: "where() expected Expr, got
+  bool. Use the schema class (Person.age) for expressions, not an instance."

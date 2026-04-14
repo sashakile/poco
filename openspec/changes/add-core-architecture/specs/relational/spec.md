@@ -244,3 +244,184 @@ order.
 - **WHEN** `po.join(left, right, on=..., how="inner")` is materialized
 - **THEN** result rows SHALL appear ordered by left-row position first,
   then by right-row position for each match
+
+### Requirement: Null semantics divergence between groupby and join is intentional [BIZ-002]
+
+groupby and join treat `None` differently by design:
+
+- **groupby**: `None` keys are treated as equal — all rows with `None` for a
+  key column are placed in the same group. Rationale: groupby answers "what are
+  the groups?", and "unknown" is a valid group. This follows pandas convention.
+- **join**: `None == None` evaluates to `False` — rows with `None` join keys
+  never match. Rationale: join answers "which rows correspond?", and two unknown
+  values should not be assumed to correspond. This follows SQL convention.
+
+This divergence is intentional and documented. Both specs cross-reference
+each other.
+
+#### Scenario: Developer observes different null behavior
+
+- **GIVEN** `df` has rows with `dept=None`
+- **WHEN** `df | po.groupby(Person.dept, n=po.count_of())` is called
+- **THEN** all `None`-dept rows SHALL be in one group with count > 1
+- **BUT** `po.join(df, df2, on=Person.dept == S2.dept)` where both have
+  `dept=None`
+- **THEN** no match SHALL be produced (`None != None` in join)
+
+### Requirement: Self-join uses positional parsing of on-expression [BIZ-003]
+
+Self-join (`po.join(df, df, on=...)`) is supported. The `on` expression's
+positional structure determines left vs right mapping:
+
+- In `on=ColumnRef_A == ColumnRef_B`, the left operand of `==` is evaluated
+  against the left DataFrame's schema, the right operand against the right
+  DataFrame's schema
+- For self-join where both schemas are identical, position is the only
+  differentiator
+- `po.join(df, df, on=Person.id == Person.id)` is valid: left `Person.id`
+  from left df, right `Person.id` from right df
+
+Self-join requires explicit suffixes when non-key columns collide (which they
+always will for true self-joins).
+
+#### Scenario: Self-join with suffixes
+
+- **GIVEN** `df` uses schema `Person(id: int, name: str)`
+- **WHEN** `po.join(df, df, on=Person.id == Person.id, suffixes=("_1", "_2"))`
+- **THEN** result SHALL have columns: `[id, name_1, name_2]`
+
+#### Scenario: Self-join without suffixes when columns collide
+
+- **GIVEN** `df` uses schema `Person(id: int, name: str)`
+- **WHEN** `po.join(df, df, on=Person.id == Person.id)` (default suffixes)
+- **THEN** result SHALL have columns: `[id, name_left, name_right]`
+
+### Requirement: groupby accepts arbitrary Expr as keys, not only ColumnRef [BIZ-004]
+
+groupby key arguments can be any `Expr`, not just `ColumnRef`. For computed key
+expressions, the output column name cannot be automatically determined.
+
+- ColumnRef keys: output column named after the column (e.g., `Person.dept` →
+  `"dept"`)
+- Computed Expr keys: SHALL raise `ValueError` if used as positional arguments,
+  because the output column name cannot be automatically determined
+
+To use a computed key, the developer should first derive the key column, then
+group by it:
+`df | po.derive(band=Person.salary // 10000) | po.groupby(schema.band, total=po.sum_of(Person.salary))`
+
+#### Scenario: ColumnRef as groupby key
+
+- **WHEN** `df | po.groupby(Person.dept, total=po.sum_of(Person.salary))`
+- **THEN** result SHALL have columns `[dept, total]`
+
+#### Scenario: Computed expression as positional groupby key
+
+- **WHEN** `df | po.groupby(Person.salary // 10000, total=po.sum_of(Person.salary))`
+- **THEN** the system SHALL raise a `ValueError`: "Computed expression used as
+  groupby key. Cannot infer output column name. Use po.derive() to create a
+  named column first, then group by it."
+
+### Requirement: Join key uses left-side column name; right-side key column is dropped [BIZ-005]
+
+When join key columns have different names (`on=L.emp_id == R.employee_id`),
+the result schema uses the left-side column name (`"emp_id"`). The right-side
+key column (`"employee_id"`) is not included in the output — it is redundant
+with the join key.
+
+#### Scenario: Asymmetric key names
+
+- **GIVEN** left has columns `[emp_id, name]`, right has columns
+  `[employee_id, salary]`
+- **WHEN** `po.join(left, right, on=L.emp_id == R.employee_id)`
+- **THEN** result columns SHALL be `[emp_id, name, salary]` (no `"employee_id"`)
+
+### Requirement: Join output column order is deterministic [MATH-009]
+
+Join output columns SHALL be ordered as follows:
+
+1. Join key columns (using left-side names), in order of appearance in the
+   `on` expression
+2. Remaining left-side columns (excluding keys), in left schema field order
+3. Remaining right-side columns (excluding keys), in right schema field order
+
+Non-key columns with name collisions SHALL have suffixes applied before ordering.
+
+#### Scenario: Join column ordering
+
+- **GIVEN** left schema: `[id, name, dept]`, right schema: `[id, salary, dept]`
+- **AND** `on=L.id == R.id` (single key)
+- **AND** suffix collision on `"dept"` → `dept_left`, `dept_right`
+- **WHEN** join result schema is computed
+- **THEN** column order SHALL be `[id, name, dept_left, salary, dept_right]`
+
+### Requirement: groupby with all-None key values produces single group [MATH-010]
+
+When all rows have `None` for the groupby key column, they are treated as
+equal and form a single group. The result is one row with the key column value
+as `None` and the aggregated values.
+
+#### Scenario: All-None groupby key
+
+- **GIVEN** `df` has 5 rows, all with `dept=None`
+- **WHEN** `df | po.groupby(Person.dept, n=po.count_of())`
+- **THEN** result SHALL be 1 row: `{dept: None, n: 5}`
+
+### Requirement: Join suffixes apply only to colliding non-key columns [MATH-013]
+
+Suffixes SHALL be applied only to non-key columns that have the same name in
+both the left and right schemas. Non-colliding columns SHALL retain their
+original names.
+
+#### Scenario: Suffixes on colliding columns only
+
+- **GIVEN** left schema: `[id, name, dept]`, right schema: `[id, salary, dept]`
+- **AND** join on `id`, suffixes `("_left", "_right")`
+- **WHEN** result schema is computed
+- **THEN** columns SHALL be `[id, name, dept_left, salary, dept_right]`
+- **AND** `"name"` and `"salary"` SHALL NOT be suffixed (no collision)
+
+#### Scenario: No collisions, no suffixes
+
+- **GIVEN** left schema: `[id, name]`, right schema: `[id, salary]`
+- **AND** join on `id`
+- **WHEN** result schema is computed
+- **THEN** columns SHALL be `[id, name, salary]` (no suffixes applied)
+
+### Requirement: SchemaError if suffixes do not resolve all column name collisions [ARCH-010]
+
+After applying suffixes to colliding non-key columns, if any column names
+still collide, `SchemaError` SHALL be raised at join construction time.
+
+#### Scenario: Suffixes that don't resolve collision
+
+- **GIVEN** left schema: `[id, name_left]`, right schema: `[id, name]`
+- **AND** suffixes `("_left", "_right")`
+- **WHEN** left's `"name_left"` does not collide, but right's `"name"` becomes
+  `"name_right"`
+- **THEN** no collision — valid
+
+#### Scenario: Identical suffixes cause post-suffix collision
+
+- **GIVEN** left schema: `[id, name]`, right schema: `[id, name]`
+- **AND** suffixes `("_x", "_x")`
+- **WHEN** suffixes are applied: left `"name_x"`, right `"name_x"`
+- **THEN** the system SHALL raise a `SchemaError`: "Suffix application did not
+  resolve column name collision: 'name_x'. Use distinct suffixes."
+
+### Requirement: IntegrityError from join validate includes key values and source [BIZ-012]
+
+When join validation (`validate="1:1"`, `"1:N"`, `"N:1"`) fails, the
+`IntegrityError` SHALL include:
+
+- Which side violated uniqueness (left, right, or both)
+- The duplicate key value(s) that caused the violation
+- The validate mode that was specified
+
+#### Scenario: 1:1 validation failure
+
+- **GIVEN** left df has duplicate key value `42`
+- **WHEN** `po.join(left, right, on=..., validate="1:1")`
+- **THEN** at materialization, the system SHALL raise an `IntegrityError`:
+  "Join validation failed (validate='1:1'): duplicate key [42] found on
+  left side"

@@ -55,3 +55,31 @@ their wrapped reducer on empty input.
 
 - **WHEN** `po.reduce(po.min_of(Person.age), [])` is called
 - **THEN** the system SHALL raise the same empty-input error behavior as `po.min_reducer`
+
+### Requirement: sum_of return type matches input column type
+
+Column-bound reducers preserve the input column's base type in their result:
+
+- `sum_of` on `int` column returns `int`
+- `sum_of` on `float` column returns `float`
+- `sum_of` on `bool` column returns `int` (bool promoted to int for summation)
+- `mean_of` always returns `float` (division produces float regardless of
+  input type)
+- `min_of`, `max_of` return the same type as the input column
+- `count_of` always returns `int`
+
+When `sum_reducer` is applied directly (not via `sum_of`), the same
+type-preservation rules apply: all-int input produces an `int` result,
+any-float input produces a `float` result.
+
+#### Scenario: sum_of on integer column
+
+- **WHEN** `po.reduce(po.sum_of(Person.salary), df)` is called on a DataFrame
+  where column `salary` has values `[100, 200, 300]` (all `int`)
+- **THEN** the result SHALL be `600` with type `int`
+
+#### Scenario: sum_of on float column
+
+- **WHEN** `po.reduce(po.sum_of(Person.salary), df)` is called on a DataFrame
+  where column `salary` has values `[1.5, 2.5, 3.0]` (all `float`)
+- **THEN** the result SHALL be `7.0` with type `float`

@@ -146,3 +146,54 @@ produce fresh, independent state.
 - **WHEN** `taking(2)` wraps `to_list` twice (two separate calls)
 - **THEN** each wrapped reducer SHALL independently track its own count
 - **AND** both SHALL take exactly 2 items from their respective inputs
+
+### Requirement: Transducer factories are stateless and reusable
+
+Transducer factories (e.g., `filtering(pred)`, `taking(n)`, `mapping(fn)`) return transducer values that are reusable. Each application of a transducer to a reducer (wrapping) produces independent state.
+
+- The transducer value itself is stateless and can be stored, passed around, and applied multiple times
+- Each wrapping creates a fresh closure with independent mutable state
+- Wrapping the same transducer twice produces two independent reducer wrappers
+
+#### Scenario: Reusing a transducer value
+
+- **WHEN** `xf = po.taking(2)` is created and `r1 = xf(to_list_reducer)` and `r2 = xf(to_list_reducer)` are created
+- **THEN** r1 and r2 SHALL have independent counters
+- **AND** reducing `[1, 2, 3, 4, 5]` through r1 SHALL yield `[1, 2]`
+- **AND** reducing `[1, 2, 3, 4, 5]` through r2 SHALL also yield `[1, 2]`
+
+#### Scenario: Transducer in reusable pipeline
+
+- **WHEN** `pipeline = po.where(Person.age > 25) | po.taking(3)` is created
+- **THEN** `df1 | pipeline` and `df2 | pipeline` each materialized SHALL get independent taking(3) state
+
+### Requirement: Complete propagation order in transducer composition
+
+In composed transducers `xf1 | xf2`, the complete() call propagates from outermost to innermost:
+
+1. xf1's complete() is called first (outermost in wrapping order)
+2. xf1's complete() calls xf2's complete() on appropriate state
+3. xf2's complete() calls the inner reducer's complete()
+
+Each layer's complete() sees the accumulator state it produced during step() calls. If a layer has buffered state (e.g., a batching transducer), it flushes during complete() before propagating inward.
+
+When Reduced propagates outward during step(), the subsequent complete() call still follows this outermost-first ordering.
+
+#### Scenario: Complete ordering with taking
+
+- **WHEN** `xf = mapping(str.upper) | taking(2)` is applied to `to_list` reducer and reduces `["a", "b", "c"]`
+- **THEN** mapping's complete() SHALL be called, which calls taking's complete(), which calls to_list's complete()
+- **AND** the result SHALL be `["A", "B"]`
+
+### Requirement: Stateful transducer state independence verified via property-based testing
+
+Property-based tests MUST verify that stateful transducers (taking, dropping, distinct) produce identical results on repeated applications:
+
+For any stateful transducer xf and any input sequence xs:
+- `po.reduce(po.to_list, xs, transducer=xf)` called twice with the same inputs produces identical results
+- Two independent wrappings of the same transducer on overlapping data produce correct independent results
+
+#### Scenario: taking produces same result on repeated reduce
+
+- **WHEN** `xf = po.taking(3)` and `data = [1, 2, 3, 4, 5]`
+- **THEN** `po.reduce(po.to_list, data, transducer=xf)` called twice SHALL produce `[1, 2, 3]` both times

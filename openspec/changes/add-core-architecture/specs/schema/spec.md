@@ -219,3 +219,80 @@ change the type SHALL be rejected.
   where `SchemaA` and `SchemaB` are `@po.schema` classes with overlapping fields
 - **THEN** the system SHALL raise a `SchemaError` indicating that multiple
   schema inheritance with overlapping fields is not supported
+
+### Requirement: Zero-field schema is valid
+
+A `@po.schema`-decorated class with no fields is valid and produces a schema
+with zero columns. This is consistent with empty DataFrame construction from
+`{}` and `[]`.
+
+#### Scenario: Zero-field schema declaration
+
+- **WHEN** a user defines `@po.schema class Empty: pass`
+- **THEN** it SHALL produce a valid schema with 0 columns
+- **AND** `dataclasses.fields(Empty)` SHALL return an empty tuple
+
+#### Scenario: Zero-field schema with DataFrame
+
+- **WHEN** a user constructs `po.DataFrame([], schema=Empty)`
+- **THEN** a valid DataFrame with 0 columns and 0 rows SHALL be created
+
+### Requirement: Schema field ordering is deterministic
+
+Schema field order follows these rules:
+
+- **Declared schema** (`@po.schema`): fields are ordered by declaration order
+  in the class body
+- **Inherited schema**: parent fields first (in parent declaration order),
+  then child fields (in child declaration order)
+- **Inferred schema from dict**: fields ordered by key insertion order of the
+  first dict (for dict-of-lists, the dict's key order; for list-of-dicts, the
+  first row's key order)
+- **Auto-generated schema** (from `select`, `derive`, `groupby`, `join`):
+  fields ordered as defined by the operation (`select`: argument order;
+  `derive`: original columns then new columns in keyword order; `groupby`: key
+  columns then aggregation columns in keyword order; `join`: see relational
+  spec)
+
+Row keys (`dict[str, object]`) always correspond to the schema field order.
+
+#### Scenario: Inherited field ordering
+
+- **WHEN** a user defines `@po.schema class Base: a: int; b: str` and
+  `@po.schema class Child(Base): c: float`
+- **THEN** `dataclasses.fields(Child)` SHALL return fields ordered `[a, b, c]`
+  (parent first, then child)
+
+#### Scenario: Inferred schema from dict
+
+- **WHEN** a user creates `po.DataFrame({"z": [1], "a": [2], "m": [3]})`
+- **THEN** the inferred schema field order SHALL be `[z, a, m]` (dict key
+  insertion order)
+
+### Requirement: Schema inference rejects incompatible type families
+
+Type promotion applies only within the numeric family (`bool < int < float`).
+Cross-family combinations (numeric + `str`) raise `SchemaError`.
+
+#### Scenario: bool and str column raises SchemaError
+
+- **WHEN** a user creates `po.DataFrame({"flag": [True, "yes"]})`
+- **THEN** the system SHALL raise a `SchemaError` indicating column `"flag"`
+  has incompatible types `bool` and `str`
+
+#### Scenario: int and str column raises SchemaError
+
+- **WHEN** a user creates `po.DataFrame({"value": [1, "one"]})`
+- **THEN** the system SHALL raise a `SchemaError` indicating column `"value"`
+  has incompatible types `int` and `str`
+
+#### Scenario: all-bool column infers bool
+
+- **WHEN** a user creates `po.DataFrame({"flag": [True, False, True]})`
+- **THEN** the inferred type for column `"flag"` SHALL be `bool` (not promoted
+  to `int`)
+
+#### Scenario: bool and None infers Optional[bool]
+
+- **WHEN** a user creates `po.DataFrame({"flag": [True, None, False]})`
+- **THEN** the inferred type for column `"flag"` SHALL be `bool | None`
