@@ -24,13 +24,15 @@ single always-lazy DataFrame type, and relational operations.
 - Add schema inference with numeric type promotion and `schema.to_code()` bridge
 - Add relational operations: `groupby` as an endomorphism-preserving pipeline
   step and `join` as a lazy DataFrame-producing function
+- Add a public error model covering exception taxonomy, structured diagnostic
+  fields, documented pass-through exceptions, and message-quality rules
 - Separate capability boundaries so the spec graph is a DAG rather than a
   cycle between DataFrame, pipeline, and expression contracts
 
 ## Impact
 
 - Affected specs: row-model, schema, expression, reducer, transducer,
-  aggregation, pipeline, dataframe, relational
+  aggregation, pipeline, dataframe, relational, errors
 - Affected code: `poco/` (full rewrite of stubs)
 - **BREAKING**: Removes `Series` class. Removes empty-constructor `DataFrame`.
 - No `GroupedDataFrame` type — `groupby` returns a `PipelineStep` to preserve the `DataFrame | step → DataFrame` endomorphism.

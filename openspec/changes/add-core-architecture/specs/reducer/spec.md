@@ -124,7 +124,7 @@ The system SHALL provide these built-in reducers:
 
 ### Requirement: Reducer protocol state machine and violation behavior
 
-The reducer protocol defines an implicit state machine with three states:
+The reducer protocol SHALL define an implicit state machine with three states:
 
 ```
 Uninitialized ──init()──► Stepping ──step()──► Stepping
@@ -155,7 +155,7 @@ Note: poco does not enforce state machine transitions at runtime (no ProtocolErr
 
 ### Requirement: Built-in reducer empty-input behavior
 
-Each built-in reducer has defined behavior on empty input (complete(init())):
+Each built-in reducer SHALL have defined behavior on empty input (complete(init())):
 
 | Reducer | Empty Input Result | Classification |
 |---|---|---|

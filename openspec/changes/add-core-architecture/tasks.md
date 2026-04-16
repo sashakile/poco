@@ -54,7 +54,12 @@
 - [ ] 9.5 Implement `po.groupby`, `po.join`, relational validation, and relational schema generation
 - [ ] 9.6 Tidy relational planners and schema builders after tests pass
 
-## 10. Integration and polish
-- [ ] 10.1 Update exports and public API documentation
-- [ ] 10.2 Update tests, README examples, `llm.txt`, and `openspec/project.md`
-- [ ] 10.3 Validate that the capability graph remains acyclic as the implementation lands
+## 10. Error model and diagnostics
+- [ ] 10.1 Write tests for public exception taxonomy, structured diagnostic fields, and documented pass-through exceptions
+- [ ] 10.2 Implement public error classes, exception translation rules, message-quality standards, and cause chaining
+- [ ] 10.3 Add regression tests for every new public exception path and document common failure modes
+
+## 11. Integration and polish
+- [ ] 11.1 Update exports and public API documentation
+- [ ] 11.2 Update tests, README examples, `llm.txt`, and `openspec/project.md`
+- [ ] 11.3 Validate that the capability graph remains acyclic as the implementation lands

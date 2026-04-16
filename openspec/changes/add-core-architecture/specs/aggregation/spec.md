@@ -58,7 +58,7 @@ their wrapped reducer on empty input.
 
 ### Requirement: sum_of return type matches input column type
 
-Column-bound reducers preserve the input column's base type in their result:
+Column-bound reducers SHALL preserve the input column's base type in their result:
 
 - `sum_of` on `int` column returns `int`
 - `sum_of` on `float` column returns `float`

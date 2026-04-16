@@ -309,8 +309,8 @@ message suggesting explicit type annotation.
 
 ### Requirement: Expr raises TypeError in boolean context
 
-Expr defines `__bool__` to raise TypeError. Using an Expr in a boolean
-context (`if`, `and`, `or`, `not`, `assert`) raises TypeError with message:
+Expr SHALL define `__bool__` to raise TypeError. Using an Expr in a boolean
+context (`if`, `and`, `or`, `not`, `assert`) SHALL raise TypeError with message:
 "Expr cannot be used as bool. Use .equals(other) for structural comparison,
 or po.where(expr) for filtering."
 
@@ -329,10 +329,11 @@ or po.where(expr) for filtering."
 
 ### Requirement: Unhashable Expr error includes guidance
 
-When Expr is used in a hash-requiring context (dict key, set member), Python
-raises TypeError: "unhashable type". `Expr.__hash__ = None` produces this
-naturally. Documentation and error guidance should note: "Expr is unhashable.
-Use column name strings as dict keys or set members instead."
+The system SHALL treat Expr as unhashable in any hash-requiring context (dict
+key, set member). Python SHALL raise TypeError: "unhashable type".
+`Expr.__hash__ = None` SHALL produce this naturally. Documentation and error
+ guidance SHALL note: "Expr is unhashable. Use column name strings as dict keys
+or set members instead."
 
 #### Scenario: Expr as dict key
 
@@ -342,8 +343,8 @@ Use column name strings as dict keys or set members instead."
 
 ### Requirement: Boolean Expr operators do not short-circuit
 
-Boolean operators `&`, `|`, and `~` on Expr build AST nodes. Both operands
-of `&` and `|` are always evaluated at materialization time. There is no
+Boolean operators `&`, `|`, and `~` on Expr SHALL build AST nodes. Both operands
+of `&` and `|` SHALL always be evaluated at materialization time. There SHALL be no
 short-circuit evaluation.
 
 This means `(Person.age > 0) & (Person.salary / Person.age > 1000)` will
@@ -367,8 +368,8 @@ False. To guard against this, use nested `where()` steps or `fill_null()`.
 
 ### Requirement: NaN behavior in expression evaluation
 
-`float("nan")` is a valid float column value (not treated as `None`). NaN
-follows IEEE 754 semantics in expression evaluation:
+`float("nan")` SHALL be a valid float column value (not treated as `None`). NaN
+SHALL follow IEEE 754 semantics in expression evaluation:
 
 - Comparison: NaN compared to any value (including NaN) returns False,
   except `!=` which returns True
@@ -403,9 +404,9 @@ NaN in specific operations (defined in respective specs):
 
 ### Requirement: Complete expression type inference decision table
 
-Expression result type inference covers all supported type combinations.
-The following table defines the result type for each operator class.
-Combinations marked SchemaError are rejected at pipeline construction time.
+Expression result type inference SHALL cover all supported type combinations.
+The following table SHALL define the result type for each operator class.
+Combinations marked SchemaError SHALL be rejected at pipeline construction time.
 
 **Arithmetic operators** (`+`, `-`, `*`, `//`):
 
@@ -448,16 +449,22 @@ only comparable to `str`. Cross-family comparisons raise SchemaError.
 Boolean operators require both operands to be `bool`. `~` (unary NOT)
 requires `bool` operand.
 
-**Nullability**: `Optional[T]` is treated as `T` for type inference purposes.
-Nullability does not widen the result type. Each operand with `Optional` type
-must be independently handled via `fill_null()` or filtered via
+**Nullability**: `Optional[T]` SHALL be treated as `T` for type inference purposes.
+Nullability SHALL NOT widen the result type. Each operand with `Optional` type
+MUST be independently handled via `fill_null()` or filtered via
 `where(expr.is_null())` before use in operations that would raise
 `NullValueError`.
 
+#### Scenario: Unsupported type combination raises SchemaError
+
+- **WHEN** a developer constructs an expression combining unsupported type
+  families such as `str` and `int` in arithmetic
+- **THEN** the system SHALL raise `SchemaError` at pipeline construction time
+
 ### Requirement: fill_null applies per-expression in binary operations
 
-In a binary expression with two `Optional` operands, each operand must be
-independently handled with `fill_null()`. `fill_null` on one side does not
+In a binary expression with two `Optional` operands, each operand SHALL be
+independently handled with `fill_null()`. `fill_null` on one side SHALL NOT
 affect the other side.
 
 #### Scenario: Both operands Optional, only one filled

@@ -222,8 +222,8 @@ change the type SHALL be rejected.
 
 ### Requirement: Zero-field schema is valid
 
-A `@po.schema`-decorated class with no fields is valid and produces a schema
-with zero columns. This is consistent with empty DataFrame construction from
+A `@po.schema`-decorated class with no fields SHALL be valid and SHALL produce a schema
+with zero columns. This SHALL be consistent with empty DataFrame construction from
 `{}` and `[]`.
 
 #### Scenario: Zero-field schema declaration
@@ -239,7 +239,7 @@ with zero columns. This is consistent with empty DataFrame construction from
 
 ### Requirement: Schema field ordering is deterministic
 
-Schema field order follows these rules:
+Schema field order SHALL follow these rules:
 
 - **Declared schema** (`@po.schema`): fields are ordered by declaration order
   in the class body
@@ -271,8 +271,8 @@ Row keys (`dict[str, object]`) always correspond to the schema field order.
 
 ### Requirement: Schema inference rejects incompatible type families
 
-Type promotion applies only within the numeric family (`bool < int < float`).
-Cross-family combinations (numeric + `str`) raise `SchemaError`.
+Type promotion SHALL apply only within the numeric family (`bool < int < float`).
+Cross-family combinations (numeric + `str`) SHALL raise `SchemaError`.
 
 #### Scenario: bool and str column raises SchemaError
 

@@ -149,7 +149,7 @@ produce fresh, independent state.
 
 ### Requirement: Transducer factories are stateless and reusable
 
-Transducer factories (e.g., `filtering(pred)`, `taking(n)`, `mapping(fn)`) return transducer values that are reusable. Each application of a transducer to a reducer (wrapping) produces independent state.
+Transducer factories (e.g., `filtering(pred)`, `taking(n)`, `mapping(fn)`) SHALL return transducer values that are reusable. Each application of a transducer to a reducer (wrapping) SHALL produce independent state.
 
 - The transducer value itself is stateless and can be stored, passed around, and applied multiple times
 - Each wrapping creates a fresh closure with independent mutable state
@@ -169,7 +169,7 @@ Transducer factories (e.g., `filtering(pred)`, `taking(n)`, `mapping(fn)`) retur
 
 ### Requirement: Complete propagation order in transducer composition
 
-In composed transducers `xf1 | xf2`, the complete() call propagates from outermost to innermost:
+In composed transducers `xf1 | xf2`, the complete() call SHALL propagate from outermost to innermost:
 
 1. xf1's complete() is called first (outermost in wrapping order)
 2. xf1's complete() calls xf2's complete() on appropriate state

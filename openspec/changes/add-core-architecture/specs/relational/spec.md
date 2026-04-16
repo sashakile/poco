@@ -10,7 +10,8 @@ The `on` expression SHALL be restricted to:
 - a conjunction of column-reference equalities combined with `&`
 
 Computed expressions (e.g., `L.id + 1 == R.id`) SHALL NOT be accepted as
-join predicates. The system SHALL raise a `TypeError` if a non-ColumnRef
+join predicates. Because this is a well-formed but unsupported relational
+feature, the system SHALL raise `UnsupportedOperationError` if a non-ColumnRef
 expression is used in a join predicate.
 
 **Positional Constraint:** Each equality SHALL be interpreted positionally:
@@ -35,8 +36,8 @@ left-hand side of the equality expression SHALL be preserved as the join key.
 #### Scenario: Computed join predicate raises error
 
 - **WHEN** `po.join(df1, df2, on=(S1.id + 1 == S2.id))` is called
-- **THEN** the system SHALL raise a `TypeError` indicating that join
-  predicates must be column-reference equalities
+- **THEN** the system SHALL raise `UnsupportedOperationError` indicating that
+  join predicates must be column-reference equalities
 
 ### Requirement: Supported join types
 
@@ -164,8 +165,10 @@ with `&`.
 
 ### Requirement: Groupby as relational pipeline step
 
-`po.groupby(*key_exprs, **aggregations)` SHALL accept one or more `Expr`
-objects as group keys and named aggregation reducers. It SHALL return a
+`po.groupby(*key_exprs, **aggregations)` SHALL accept one or more `ColumnRef`
+objects as direct group keys and named aggregation reducers. Computed key
+expressions SHALL require a prior `po.derive(...)` step so that the grouped key
+has a stable output column name. `po.groupby(...)` SHALL return a
 `PipelineStep` (materializing), preserving the endomorphism
 `DataFrame | step -> DataFrame`.
 
@@ -225,8 +228,8 @@ time, before collection.
 #### Scenario: Unsupported join predicate raises error at call time
 
 - **WHEN** `po.join(df1, df2, on=(S1.salary > S2.salary))` is called
-- **THEN** the system SHALL raise a `ValueError` indicating that only
-  column-reference equalities are supported as join predicates
+- **THEN** the system SHALL raise `UnsupportedOperationError` indicating that
+  only column-reference equalities are supported as join predicates
 
 #### Scenario: Relational result composes with downstream pipeline
 
@@ -247,7 +250,7 @@ order.
 
 ### Requirement: Null semantics divergence between groupby and join is intentional [BIZ-002]
 
-groupby and join treat `None` differently by design:
+groupby and join SHALL treat `None` differently by design:
 
 - **groupby**: `None` keys are treated as equal — all rows with `None` for a
   key column are placed in the same group. Rationale: groupby answers "what are
@@ -256,8 +259,9 @@ groupby and join treat `None` differently by design:
   never match. Rationale: join answers "which rows correspond?", and two unknown
   values should not be assumed to correspond. This follows SQL convention.
 
-This divergence is intentional and documented. Both specs cross-reference
-each other.
+This divergence is intentional and documented. It SHALL be referenced by both
+`relational` join semantics and `relational` groupby semantics so that readers
+can trace the intentional difference explicitly.
 
 #### Scenario: Developer observes different null behavior
 
@@ -270,8 +274,8 @@ each other.
 
 ### Requirement: Self-join uses positional parsing of on-expression [BIZ-003]
 
-Self-join (`po.join(df, df, on=...)`) is supported. The `on` expression's
-positional structure determines left vs right mapping:
+Self-join (`po.join(df, df, on=...)`) SHALL be supported. The `on` expression's
+positional structure SHALL determine left vs right mapping:
 
 - In `on=ColumnRef_A == ColumnRef_B`, the left operand of `==` is evaluated
   against the left DataFrame's schema, the right operand against the right
@@ -281,8 +285,8 @@ positional structure determines left vs right mapping:
 - `po.join(df, df, on=Person.id == Person.id)` is valid: left `Person.id`
   from left df, right `Person.id` from right df
 
-Self-join requires explicit suffixes when non-key columns collide (which they
-always will for true self-joins).
+Self-join SHALL support default suffixes when non-key columns collide.
+Callers MAY provide explicit suffixes to override the defaults.
 
 #### Scenario: Self-join with suffixes
 
@@ -296,17 +300,17 @@ always will for true self-joins).
 - **WHEN** `po.join(df, df, on=Person.id == Person.id)` (default suffixes)
 - **THEN** result SHALL have columns: `[id, name_left, name_right]`
 
-### Requirement: groupby accepts arbitrary Expr as keys, not only ColumnRef [BIZ-004]
+### Requirement: groupby uses named columns as keys; computed keys require derive [BIZ-004]
 
-groupby key arguments can be any `Expr`, not just `ColumnRef`. For computed key
-expressions, the output column name cannot be automatically determined.
+Direct `groupby` key arguments SHALL be `ColumnRef` expressions so that the
+output key columns have stable names.
 
 - ColumnRef keys: output column named after the column (e.g., `Person.dept` →
   `"dept"`)
-- Computed Expr keys: SHALL raise `ValueError` if used as positional arguments,
-  because the output column name cannot be automatically determined
+- Computed Expr keys: SHALL raise `ValueError` if used directly, because the
+  output column name cannot be automatically determined
 
-To use a computed key, the developer should first derive the key column, then
+To use a computed key, the developer SHALL first derive the key column, then
 group by it:
 `df | po.derive(band=Person.salary // 10000) | po.groupby(schema.band, total=po.sum_of(Person.salary))`
 
@@ -315,7 +319,7 @@ group by it:
 - **WHEN** `df | po.groupby(Person.dept, total=po.sum_of(Person.salary))`
 - **THEN** result SHALL have columns `[dept, total]`
 
-#### Scenario: Computed expression as positional groupby key
+#### Scenario: Computed expression as direct groupby key
 
 - **WHEN** `df | po.groupby(Person.salary // 10000, total=po.sum_of(Person.salary))`
 - **THEN** the system SHALL raise a `ValueError`: "Computed expression used as
@@ -324,10 +328,10 @@ group by it:
 
 ### Requirement: Join key uses left-side column name; right-side key column is dropped [BIZ-005]
 
-When join key columns have different names (`on=L.emp_id == R.employee_id`),
-the result schema uses the left-side column name (`"emp_id"`). The right-side
-key column (`"employee_id"`) is not included in the output — it is redundant
-with the join key.
+The system SHALL preserve the left-side column name when join key columns have
+different names (`on=L.emp_id == R.employee_id`). The result schema SHALL use
+`"emp_id"`. The right-side key column (`"employee_id"`) SHALL NOT be included in
+the output because it is redundant with the join key.
 
 #### Scenario: Asymmetric key names
 
@@ -335,6 +339,16 @@ with the join key.
   `[employee_id, salary]`
 - **WHEN** `po.join(left, right, on=L.emp_id == R.employee_id)`
 - **THEN** result columns SHALL be `[emp_id, name, salary]` (no `"employee_id"`)
+
+#### Scenario: Multi-key asymmetric names with nulls
+
+- **GIVEN** left has columns `[a_left, b_left, payload_left]`
+- **AND** right has columns `[a_right, b_right, payload_right]`
+- **WHEN** `po.join(left, right, on=(L.a_left == R.a_right) & (L.b_left == R.b_right), how="outer")`
+- **AND** one candidate row pair has `a_left=1`, `a_right=1`, `b_left=None`, `b_right=None`
+- **THEN** that pair SHALL NOT match because `None == None` is false for join keys
+- **AND** output key columns SHALL be `[a_left, b_left]`
+- **AND** right-side key columns `a_right` and `b_right` SHALL NOT appear in the output
 
 ### Requirement: Join output column order is deterministic [MATH-009]
 
@@ -357,8 +371,8 @@ Non-key columns with name collisions SHALL have suffixes applied before ordering
 
 ### Requirement: groupby with all-None key values produces single group [MATH-010]
 
-When all rows have `None` for the groupby key column, they are treated as
-equal and form a single group. The result is one row with the key column value
+When all rows have `None` for the groupby key column, they SHALL be treated as
+equal and SHALL form a single group. The result SHALL be one row with the key column value
 as `None` and the aggregated values.
 
 #### Scenario: All-None groupby key
@@ -390,8 +404,8 @@ original names.
 
 ### Requirement: SchemaError if suffixes do not resolve all column name collisions [ARCH-010]
 
-After applying suffixes to colliding non-key columns, if any column names
-still collide, `SchemaError` SHALL be raised at join construction time.
+The system SHALL raise `SchemaError` at join construction time if any column
+names still collide after applying suffixes to colliding non-key columns.
 
 #### Scenario: Suffixes that don't resolve collision
 
@@ -411,8 +425,8 @@ still collide, `SchemaError` SHALL be raised at join construction time.
 
 ### Requirement: IntegrityError from join validate includes key values and source [BIZ-012]
 
-When join validation (`validate="1:1"`, `"1:N"`, `"N:1"`) fails, the
-`IntegrityError` SHALL include:
+The system SHALL raise `IntegrityError` when join validation
+(`validate="1:1"`, `"1:N"`, `"N:1"`) fails, and that error SHALL include:
 
 - Which side violated uniqueness (left, right, or both)
 - The duplicate key value(s) that caused the violation
