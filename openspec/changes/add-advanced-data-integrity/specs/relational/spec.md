@@ -37,7 +37,7 @@ time.
 
 ### Requirement: Join validate IntegrityError includes diagnostic context
 
-When join validation fails, IntegrityError includes:
+When join validation fails, `IntegrityError` SHALL include:
 - The validate mode that was specified (e.g., "1:1", "1:N", "N:1")
 - Which side violated uniqueness (left, right, or both)
 - The first duplicate key value(s) found

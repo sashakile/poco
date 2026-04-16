@@ -20,7 +20,7 @@ over large streams of small values.
 
 ### Requirement: sum_reducer uses Neumaier compensated summation with defined error bound
 
-sum_reducer uses the Neumaier variant of compensated summation (an improvement
+`sum_reducer` SHALL use the Neumaier variant of compensated summation (an improvement
 over Kahan summation that handles the case where the running sum is smaller
 than the new addend).
 
@@ -39,7 +39,7 @@ arithmetic, use Python's `decimal.Decimal` type in a custom reducer.
 
 ### Requirement: sum_reducer propagates inf and NaN per IEEE 754
 
-sum_reducer follows IEEE 754 for special float values:
+`sum_reducer` SHALL follow IEEE 754 for special float values:
 - NaN in input: result is NaN (NaN propagates through addition)
 - inf in input: result is inf (or -inf)
 - inf + (-inf) in input: result is NaN

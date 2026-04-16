@@ -13,12 +13,13 @@ Real-world data is messy. It contains missing intervals (gaps), simultaneous eve
   - Ensuring deterministic tie-breaking for simultaneous events
   - Support for composite keys (`sort_by(ts, id)`)
 - Add **Join Multiplicity Constraints**:
-  - Optional `validate="1:1" | "1:N" | "N:1"` parameter to `po.join`
-  - Raising `IntegrityError` if the Right side join keys are not unique (for N:1/1:1)
+  - Optional `validate="1:1" | "1:N" | "N:1" | "N:N"` parameter to `po.join`
+  - Raising `IntegrityError` with structured diagnostic context when join-side uniqueness checks fail
 - Add **High-Precision Reducers**:
   - Implement Kahan summation or equivalent in `sum_reducer` to mitigate floating-point drift
 - Add **Stateful Memory Management** for transducers:
   - Add optional `max_seen` and `ttl` to `distinct()` to prevent OOM on infinite streams
+  - Make degraded semantics explicit so bounded-memory distinct is never mistaken for exact global deduplication
 - Add **Bitemporal Awareness** (Inquiry/Initial Spec):
   - Support for `event_time` vs `processing_time` tagging (logical model)
 
