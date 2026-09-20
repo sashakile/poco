@@ -207,7 +207,8 @@ fiber's rows.
 
 `Fibers.stats(key_or_selection, **named_reducers)` SHALL reduce one fiber —
 or the fibers touched by a `Selection` — using any reducer defined per
-`reducer/spec.md`, over the already-retained fibers, and SHALL return a
+`reducer/spec.md` or column-bound aggregation factory per
+`aggregation/spec.md`, over the already-retained fibers, and SHALL return a
 `dict[str, object]` of the completed results. This SHALL NOT re-execute the
 source `DataFrame`'s pipeline. It is distinct from
 `Fibers.aggregate(**named_reducers)` (per `relational/spec.md`), which

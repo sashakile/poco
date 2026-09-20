@@ -3,8 +3,9 @@
 ### Requirement: Groupby as relational pipeline step
 
 `po.groupby(*key_exprs, **aggregations)` SHALL accept one or more `ColumnRef`
-objects as direct group keys and optional named aggregation reducers.
-Computed key expressions SHALL require a prior `po.derive(...)` step so that
+objects as direct group keys and optional named aggregation reducers
+(column-bound reducer factories per `aggregation/spec.md`). Computed key
+expressions SHALL require a prior `po.derive(...)` step so that
 the grouped key has a stable output column name.
 
 Grouping and collapsing are two different operations, and grouping SHALL
