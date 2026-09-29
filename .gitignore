@@ -12,3 +12,7 @@ __pycache__/
 .beads-credential-key
 .claude
 .codex
+
+# Beads / Dolt files (added by bd init)
+.beads/proxieddb/
+*.gate.lock*
