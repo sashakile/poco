@@ -76,7 +76,7 @@ able to depend on these classes as stable API.
 
 #### Scenario: Unsupported but well-formed operation
 
-- **WHEN** a caller uses an otherwise valid operation shape that poxo does not
+- **WHEN** a caller uses an otherwise valid operation shape that poco does not
   support yet
 - **THEN** the system SHALL raise `UnsupportedOperationError`
 

@@ -80,7 +80,7 @@ able to depend on these classes as stable API.
 
 #### Scenario: Unsupported but well-formed operation
 
-- **WHEN** a caller uses an otherwise valid operation shape that poxo does not
+- **WHEN** a caller uses an otherwise valid operation shape that poco does not
   support yet
 - **THEN** the system SHALL raise `UnsupportedOperationError`
 
@@ -141,7 +141,7 @@ Messages SHALL avoid blame and SHALL not require parsing for machine behavior.
 ### Requirement: Public boundary exception translation
 
 The system SHALL translate internal container and library failures into the
-public exception taxonomy before they cross the poxo API boundary, unless a
+public exception taxonomy before they cross the poco API boundary, unless a
 specific pass-through exception is explicitly documented.
 
 Undocumented raw `KeyError`, `IndexError`, or similar implementation-detail
@@ -235,7 +235,7 @@ able to depend on these classes as stable API.
 
 #### Scenario: Unsupported but well-formed operation
 
-- **WHEN** a caller uses an otherwise valid operation shape that poxo does not
+- **WHEN** a caller uses an otherwise valid operation shape that poco does not
   support yet
 - **THEN** the system SHALL raise `UnsupportedOperationError`
 
@@ -296,7 +296,7 @@ Messages SHALL avoid blame and SHALL not require parsing for machine behavior.
 ### Requirement: Public boundary exception translation
 
 The system SHALL translate internal container and library failures into the
-public exception taxonomy before they cross the poxo API boundary, unless a
+public exception taxonomy before they cross the poco API boundary, unless a
 specific pass-through exception is explicitly documented.
 
 Undocumented raw `KeyError`, `IndexError`, or similar implementation-detail
