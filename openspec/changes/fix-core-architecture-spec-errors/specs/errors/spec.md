@@ -126,49 +126,6 @@ failures at the API boundary:
 
 ## Requirements
 
-### Requirement: Public exception taxonomy
-
-The system SHALL expose a stable public exception taxonomy rooted in
-`PocoError`. Public exception classes SHALL include at least:
-- `PocoError` — base class for documented library exceptions
-- `SchemaError` — invalid schema declarations, schema inference failures, and
-  invalid schema evolution
-- `ColumnNotFoundError` — referenced column is not present in the active schema
-- `NullValueError` — strict operation encountered `None` without explicit null
-  handling
-- `IntegrityError` — integrity or multiplicity constraint violation
-- `UnsupportedOperationError` — requested operation is well-formed but outside
-  the supported feature subset
-- `InvalidExprUsageError` — an `Expr` was used in a context it does not
-  support (boolean context, hash-requiring context). This class SHALL
-  subclass both `PocoError` and Python's built-in `TypeError`, so that code
-  catching either base class catches it.
-
-The system MAY define additional subclasses, but documented callers SHALL be
-able to depend on these classes as stable API.
-
-#### Scenario: Caller catches stable base class
-
-- **WHEN** user code wraps a pipeline in `except po.PocoError`
-- **THEN** all documented library-specific failures SHALL be catchable through
-  that base class, including `InvalidExprUsageError`
-
-#### Scenario: Unsupported but well-formed operation
-
-- **WHEN** a caller uses an otherwise valid operation shape that poxo does not
-  support yet
-- **THEN** the system SHALL raise `UnsupportedOperationError`
-
-#### Scenario: InvalidExprUsageError is dual-catchable
-
-- **WHEN** an `Expr` is used in a boolean context or as a dict/set key
-- **THEN** the system SHALL raise `InvalidExprUsageError`
-- **AND** the exception SHALL be catchable via `except po.PocoError`
-- **AND** the exception SHALL also be catchable via `except TypeError`,
-  unchanged from prior behavior, since `InvalidExprUsageError` is a
-  `TypeError` subclass
-
-
 ### Requirement: Guardrail exceptions distinguished from pass-through exceptions
 
 The system SHALL distinguish two categories of raw-Python-exception-shaped
