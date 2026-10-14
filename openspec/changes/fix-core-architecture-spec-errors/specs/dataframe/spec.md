@@ -1,5 +1,5 @@
 ---
-id: spec
+id: dataframe
 kind: intent
 statement: "WHEN a pipeline step constructor receives a non-Expr argument THE system SHALL raise TypeError with guidance and SHALL carry the renumbered non-colliding traceability tag"
 ---
@@ -10,8 +10,8 @@ statement: "WHEN a pipeline step constructor receives a non-Expr argument THE sy
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| fx.expr_arg_validation | invariant | `where`, `select`, `derive`, `sort_by`, `distinct`, and `groupby` constructors validate that arguments are Expr instances at construction time; non-Expr arguments raise `TypeError` with guidance | [[spec]] |
-| fx.tag_renumber | advisory | The requirement's tag is renumbered from the colliding `[HUM-008 / FAIL-007]` to `[HUM-009 / FAIL-008]` so tooling and cross-references distinguish it from the materialization-context requirement | [[spec]] |
+| fx.expr_arg_validation | invariant | `where`, `select`, `derive`, `sort_by`, `distinct`, and `groupby` constructors validate that arguments are Expr instances at construction time; non-Expr arguments raise `TypeError` with guidance | [[dataframe]] |
+| fx.tag_renumber | advisory | The requirement's tag is renumbered from the colliding `[HUM-008 / FAIL-007]` to `[HUM-009 / FAIL-008]` so tooling and cross-references distinguish it from the materialization-context requirement | [[dataframe]] |
 
 ## Model
 
@@ -24,14 +24,14 @@ statement: "WHEN a pipeline step constructor receives a non-Expr argument THE sy
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_validate | constructed | rejected | [[spec.fx.expr_arg_validation]] |
+| t_validate | constructed | rejected | [[dataframe.fx.expr_arg_validation]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.expr_arg_validation | unit | [[spec.fx.expr_arg_validation]] | constructor calls with bool and other non-Expr values | `TypeError` with guidance is raised at construction |
-| p.tag_renumber | unit | [[spec.fx.tag_renumber]] | traceability tag scans | `[HUM-009 / FAIL-008]` appears; `[HUM-008 / FAIL-007]` no longer collides |
+| p.expr_arg_validation | unit | [[dataframe.fx.expr_arg_validation]] | constructor calls with bool and other non-Expr values | `TypeError` with guidance is raised at construction |
+| p.tag_renumber | unit | [[dataframe.fx.tag_renumber]] | traceability tag scans | `[HUM-009 / FAIL-008]` appears; `[HUM-008 / FAIL-007]` no longer collides |
 
 ## Purpose
 

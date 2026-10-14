@@ -1,5 +1,5 @@
 ---
-id: spec
+id: reducer
 kind: intent
 statement: "THE system SHALL provide built-in reducers including a Neumaier-compensated sum_reducer that propagates IEEE 754 special values and preserves int arithmetic"
 ---
@@ -10,10 +10,10 @@ statement: "THE system SHALL provide built-in reducers including a Neumaier-comp
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| red.builtin_set | invariant | Built-in reducers are `to_list`, `count`, `sum_reducer`, `min_reducer`, `max_reducer`, and `mean` | [[spec]] |
-| red.neumaier | invariant | `sum_reducer` uses Neumaier compensated summation with O(ε) error bound instead of O(nε) naive drift | [[spec]] |
-| red.ieee_specials | invariant | NaN input yields NaN; inf yields ±inf; inf + (-inf) yields NaN; mixed int+float promotes to float with Neumaier applied | [[spec]] |
-| red.all_int_exact | invariant | All-int input uses Python's arbitrary-precision int addition, returning an int with no float conversion | [[spec]] |
+| red.builtin_set | invariant | Built-in reducers are `to_list`, `count`, `sum_reducer`, `min_reducer`, `max_reducer`, and `mean` | [[reducer]] |
+| red.neumaier | invariant | `sum_reducer` uses Neumaier compensated summation with O(ε) error bound instead of O(nε) naive drift | [[reducer]] |
+| red.ieee_specials | invariant | NaN input yields NaN; inf yields ±inf; inf + (-inf) yields NaN; mixed int+float promotes to float with Neumaier applied | [[reducer]] |
+| red.all_int_exact | invariant | All-int input uses Python's arbitrary-precision int addition, returning an int with no float conversion | [[reducer]] |
 
 ## Model
 
@@ -27,18 +27,19 @@ statement: "THE system SHALL provide built-in reducers including a Neumaier-comp
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_add | accumulating | accumulating | [[spec.red.neumaier]] |
-| t_special | accumulating | accumulating | [[spec.red.ieee_specials]] |
-| t_complete | accumulating | completed | [[spec.red.all_int_exact]] |
+| t_init | empty | accumulating | [[reducer.red.neumaier]] |
+| t_add | accumulating | accumulating | [[reducer.red.neumaier]] |
+| t_special | accumulating | accumulating | [[reducer.red.ieee_specials]] |
+| t_complete | accumulating | completed | [[reducer.red.all_int_exact]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.builtin_set | unit | [[spec.red.builtin_set]] | each built-in reducer name | the reducer exists and reduces sample inputs correctly |
-| p.neumaier | unit | [[spec.red.neumaier]] | long streams of small floats added to a large running sum | accuracy beats naive sum() and stays within O(ε) |
-| p.ieee_specials | unit | [[spec.red.ieee_specials]] | inputs containing NaN, inf, -inf, and mixed int/float | special-value results match IEEE 754 semantics |
-| p.all_int_exact | unit | [[spec.red.all_int_exact]] | all-int inputs | result is an exact int |
+| p.builtin_set | unit | [[reducer.red.builtin_set]] | each built-in reducer name | the reducer exists and reduces sample inputs correctly |
+| p.neumaier | unit | [[reducer.red.neumaier]] | long streams of small floats added to a large running sum | accuracy beats naive sum() and stays within O(ε) |
+| p.ieee_specials | unit | [[reducer.red.ieee_specials]] | inputs containing NaN, inf, -inf, and mixed int/float | special-value results match IEEE 754 semantics |
+| p.all_int_exact | unit | [[reducer.red.all_int_exact]] | all-int inputs | result is an exact int |
 
 ## Purpose
 

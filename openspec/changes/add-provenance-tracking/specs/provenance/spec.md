@@ -1,5 +1,5 @@
 ---
-id: spec
+id: provenance
 kind: intent
 statement: "THE system SHALL retain stable row provenance via opaque RowIds, a sealed data-free ProvenanceTransform composing by pullback, Selection algebra with lineage checks, first-class Fibers, and monotonic revision stamping"
 ---
@@ -10,19 +10,19 @@ statement: "THE system SHALL retain stable row provenance via opaque RowIds, a s
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| prov.rowid_stable | invariant | Every row has a stable, opaque RowId held parallel to the row-model dict; the same source row receives the same RowId on every materialization | [[spec]] |
-| prov.nondeterministic_raise | invariant | A pipeline containing a wall-clock-dependent step raises `ValueError` naming that step when a provenance-materializing operation is executed | [[spec]] |
-| prov.rowid_not_exported | invariant | `to_dict`, `to_rows`, and schema inference expose exactly the schema's declared columns; RowIds are accessible only via provenance-aware APIs | [[spec]] |
-| prov.transform_sealed | invariant | ProvenanceTransform is a sealed, data-free hierarchy (Bijection, Injection, Fibration, Span) with the same exhaustiveness discipline as SchemaTransform | [[spec]] |
-| prov.fibration_reverse_map | invariant | A Fibration maintains forward and reverse maps so `fiber_key_of(row_id)` is a direct O(1) reverse lookup, never an iteration over fiber id sets | [[spec]] |
-| prov.transform_pullback | invariant | Composing two steps via `\|` composes their ProvenanceTransforms by pullback, for every variant combination, without re-evaluating predicates | [[spec]] |
-| prov.selection_ops | invariant | `pull_back`, `push_forward`, `restrict`, and `select_rows` follow the composed provenance in reverse or forward direction; mismatched source lineage raises `ValueError` | [[spec]] |
-| prov.fiber_stats_no_reexec | invariant | `Fibers.stats` reduces already-retained fibers with any reducer or aggregation factory without re-executing the source pipeline; partial reducers over empty intersections raise per reducer/spec.md | [[spec]] |
-| prov.fibers_surface | invariant | Fibers exposes `.keys` (first-appearance order), `fibers[key]` (KeyError on unknown key), `.aggregate`, `.stats`, and `.fiber_key_of`; an empty source yields empty Fibers | [[spec]] |
-| prov.fibers_terminal | invariant | Piping a Fibers value into any pipeline step raises `TypeError`; Fibers does not subclass DataFrame; bare groupby is terminal and materializes the source plan | [[spec]] |
-| prov.selection_algebra | invariant | Selection supports `union`, `intersect`, `difference` returning new Selections, raising `ValueError` when sources differ | [[spec]] |
-| prov.cuts_intersect | invariant | Cuts from independent Fibrations over the same source combine by row-id intersection, never by constructing a cross-product of key spaces; each Fibration recomputes independently | [[spec]] |
-| prov.revision_stamped | invariant | Every Selection carries a monotonic per-lineage revision; consumers discard updates whose revision is not strictly greater than the last applied | [[spec]] |
+| prov.rowid_stable | invariant | Every row has a stable, opaque RowId held parallel to the row-model dict; the same source row receives the same RowId on every materialization | [[provenance]] |
+| prov.nondeterministic_raise | invariant | A pipeline containing a wall-clock-dependent step raises `ValueError` naming that step when a provenance-materializing operation is executed | [[provenance]] |
+| prov.rowid_not_exported | invariant | `to_dict`, `to_rows`, and schema inference expose exactly the schema's declared columns; RowIds are accessible only via provenance-aware APIs | [[provenance]] |
+| prov.transform_sealed | invariant | ProvenanceTransform is a sealed, data-free hierarchy (Bijection, Injection, Fibration, Span) with the same exhaustiveness discipline as SchemaTransform | [[provenance]] |
+| prov.fibration_reverse_map | invariant | A Fibration maintains forward and reverse maps so `fiber_key_of(row_id)` is a direct O(1) reverse lookup, never an iteration over fiber id sets | [[provenance]] |
+| prov.transform_pullback | invariant | Composing two steps via `\|` composes their ProvenanceTransforms by pullback, for every variant combination, without re-evaluating predicates | [[provenance]] |
+| prov.selection_ops | invariant | `pull_back`, `push_forward`, `restrict`, and `select_rows` follow the composed provenance in reverse or forward direction; mismatched source lineage raises `ValueError` | [[provenance]] |
+| prov.fiber_stats_no_reexec | invariant | `Fibers.stats` reduces already-retained fibers with any reducer or aggregation factory without re-executing the source pipeline; partial reducers over empty intersections raise per reducer/spec.md | [[provenance]] |
+| prov.fibers_surface | invariant | Fibers exposes `.keys` (first-appearance order), `fibers[key]` (KeyError on unknown key), `.aggregate`, `.stats`, and `.fiber_key_of`; an empty source yields empty Fibers | [[provenance]] |
+| prov.fibers_terminal | invariant | Piping a Fibers value into any pipeline step raises `TypeError`; Fibers does not subclass DataFrame; bare groupby is terminal and materializes the source plan | [[provenance]] |
+| prov.selection_algebra | invariant | Selection supports `union`, `intersect`, `difference` returning new Selections, raising `ValueError` when sources differ | [[provenance]] |
+| prov.cuts_intersect | invariant | Cuts from independent Fibrations over the same source combine by row-id intersection, never by constructing a cross-product of key spaces; each Fibration recomputes independently | [[provenance]] |
+| prov.revision_stamped | invariant | Every Selection carries a monotonic per-lineage revision; consumers discard updates whose revision is not strictly greater than the last applied | [[provenance]] |
 
 ## Model
 
@@ -38,32 +38,32 @@ statement: "THE system SHALL retain stable row provenance via opaque RowIds, a s
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_assign_ids | sourced | transformed | [[spec.prov.rowid_stable]] |
-| t_classify | transformed | transformed | [[spec.prov.transform_sealed]] |
-| t_group | transformed | grouped | [[spec.prov.fibration_reverse_map]] |
-| t_select | grouped | selected | [[spec.prov.selection_ops]] |
-| t_algebra | selected | selected | [[spec.prov.selection_algebra]] |
-| t_cut | selected | selected | [[spec.prov.cuts_intersect]] |
-| t_revise | selected | revised | [[spec.prov.revision_stamped]] |
-| t_reject_nondeterministic | transformed | sourced | [[spec.prov.nondeterministic_raise]] |
+| t_assign_ids | sourced | transformed | [[provenance.prov.rowid_stable]] |
+| t_classify | transformed | transformed | [[provenance.prov.transform_sealed]] |
+| t_group | transformed | grouped | [[provenance.prov.fibration_reverse_map]] |
+| t_select | grouped | selected | [[provenance.prov.selection_ops]] |
+| t_algebra | selected | selected | [[provenance.prov.selection_algebra]] |
+| t_cut | selected | selected | [[provenance.prov.cuts_intersect]] |
+| t_revise | selected | revised | [[provenance.prov.revision_stamped]] |
+| t_reject_nondeterministic | transformed | sourced | [[provenance.prov.nondeterministic_raise]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.rowid_stable | unit | [[spec.prov.rowid_stable]] | repeated materializations of the same source data | RowIds are identical across materializations |
-| p.nondeterministic_raise | unit | [[spec.prov.nondeterministic_raise]] | ttl-dependent pipelines plus provenance-materializing ops | `ValueError` names the offending step |
-| p.rowid_not_exported | unit | [[spec.prov.rowid_not_exported]] | exported structures of tracked DataFrames | output contains exactly the declared columns |
-| p.transform_sealed | unit | [[spec.prov.transform_sealed]] | every pipeline factory | each step's variant is correct (where→Injection, groupby→Fibration, join→Span) and matching is exhaustive |
-| p.fibration_reverse_map | unit | [[spec.prov.fibration_reverse_map]] | source RowIds of grouped frames | fiber_key_of returns via direct reverse lookup |
-| p.transform_pullback | unit | [[spec.prov.transform_pullback]] | compositions of steps of all variant combinations | fibers contain exactly the rows surviving both transforms; inspection is data-free |
-| p.selection_ops | unit | [[spec.prov.selection_ops]] | selections across shared and unrelated lineages | pull_back/push_forward/restrict/select_rows behave as specified; mismatches raise |
-| p.fiber_stats_no_reexec | unit | [[spec.prov.fiber_stats_no_reexec]] | fibers.stats calls over retained fibers | results come from retained fibers; the source pipeline is not re-executed |
-| p.fibers_surface | unit | [[spec.prov.fibers_surface]] | Fibers values including empty sources | keys order, getitem semantics, and empty-source behavior hold |
-| p.fibers_terminal | unit | [[spec.prov.fibers_terminal]] | attempts to pipe Fibers | `TypeError` is raised; Fibers is not a DataFrame |
-| p.selection_algebra | unit | [[spec.prov.selection_algebra]] | Selection pairs over shared and unrelated sources | set operations match set semantics; mismatches raise `ValueError` |
-| p.cuts_intersect | unit | [[spec.prov.cuts_intersect]] | cut pairs from independent Fibrations | intersection answers the query without any cross-product structure |
-| p.revision_stamped | unit | [[spec.prov.revision_stamped]] | out-of-order and in-order update sequences | consumers discard non-increasing revisions |
+| p.rowid_stable | unit | [[provenance.prov.rowid_stable]] | repeated materializations of the same source data | RowIds are identical across materializations |
+| p.nondeterministic_raise | unit | [[provenance.prov.nondeterministic_raise]] | ttl-dependent pipelines plus provenance-materializing ops | `ValueError` names the offending step |
+| p.rowid_not_exported | unit | [[provenance.prov.rowid_not_exported]] | exported structures of tracked DataFrames | output contains exactly the declared columns |
+| p.transform_sealed | unit | [[provenance.prov.transform_sealed]] | every pipeline factory | each step's variant is correct (where→Injection, groupby→Fibration, join→Span) and matching is exhaustive |
+| p.fibration_reverse_map | unit | [[provenance.prov.fibration_reverse_map]] | source RowIds of grouped frames | fiber_key_of returns via direct reverse lookup |
+| p.transform_pullback | unit | [[provenance.prov.transform_pullback]] | compositions of steps of all variant combinations | fibers contain exactly the rows surviving both transforms; inspection is data-free |
+| p.selection_ops | unit | [[provenance.prov.selection_ops]] | selections across shared and unrelated lineages | pull_back/push_forward/restrict/select_rows behave as specified; mismatches raise |
+| p.fiber_stats_no_reexec | unit | [[provenance.prov.fiber_stats_no_reexec]] | fibers.stats calls over retained fibers | results come from retained fibers; the source pipeline is not re-executed |
+| p.fibers_surface | unit | [[provenance.prov.fibers_surface]] | Fibers values including empty sources | keys order, getitem semantics, and empty-source behavior hold |
+| p.fibers_terminal | unit | [[provenance.prov.fibers_terminal]] | attempts to pipe Fibers | `TypeError` is raised; Fibers is not a DataFrame |
+| p.selection_algebra | unit | [[provenance.prov.selection_algebra]] | Selection pairs over shared and unrelated sources | set operations match set semantics; mismatches raise `ValueError` |
+| p.cuts_intersect | unit | [[provenance.prov.cuts_intersect]] | cut pairs from independent Fibrations | intersection answers the query without any cross-product structure |
+| p.revision_stamped | unit | [[provenance.prov.revision_stamped]] | out-of-order and in-order update sequences | consumers discard non-increasing revisions |
 
 ## Purpose
 

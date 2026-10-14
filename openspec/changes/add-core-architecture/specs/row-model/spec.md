@@ -1,5 +1,5 @@
 ---
-id: spec
+id: row.model
 kind: intent
 statement: "THE system SHALL materialize rows as insertion-ordered dicts keyed by column name, yielded as isolated copies, and shared by all evaluation and reduction paths"
 ---
@@ -10,9 +10,9 @@ statement: "THE system SHALL materialize rows as insertion-ordered dicts keyed b
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| rm.row_contract | invariant | A materialized row is a `dict[str, object]` with insertion-ordered keys matching the current schema field order | [[spec]] |
-| rm.row_isolation | invariant | Rows yielded to user code are independent dict copies; mutating a yielded row never affects DataFrame storage, execution, or later rows | [[spec]] |
-| rm.row_shared_input | invariant | All expression evaluation and row-oriented reducer/transducer processing accept the shared materialized row contract | [[spec]] |
+| rm.row_contract | invariant | A materialized row is a `dict[str, object]` with insertion-ordered keys matching the current schema field order | [[row.model]] |
+| rm.row_isolation | invariant | Rows yielded to user code are independent dict copies; mutating a yielded row never affects DataFrame storage, execution, or later rows | [[row.model]] |
+| rm.row_shared_input | invariant | All expression evaluation and row-oriented reducer/transducer processing accept the shared materialized row contract | [[row.model]] |
 
 ## Model
 
@@ -26,16 +26,16 @@ statement: "THE system SHALL materialize rows as insertion-ordered dicts keyed b
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_yield | stored | yielded | [[spec.rm.row_isolation]] |
-| t_consume | yielded | consumed | [[spec.rm.row_shared_input]] |
+| t_yield | stored | yielded | [[row.model.rm.row_isolation]] |
+| t_consume | yielded | consumed | [[row.model.rm.row_shared_input]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.row_contract | unit | [[spec.rm.row_contract]] | frames over arbitrary schemas | rows are dicts keyed by column names in schema order |
-| p.row_isolation | unit | [[spec.rm.row_isolation]] | mutations applied to yielded rows | storage and subsequent materializations are unaffected |
-| p.row_shared_input | unit | [[spec.rm.row_shared_input]] | expression evaluations and reducer iterations | every consumer interprets the same row contract |
+| p.row_contract | unit | [[row.model.rm.row_contract]] | frames over arbitrary schemas | rows are dicts keyed by column names in schema order |
+| p.row_isolation | unit | [[row.model.rm.row_isolation]] | mutations applied to yielded rows | storage and subsequent materializations are unaffected |
+| p.row_shared_input | unit | [[row.model.rm.row_shared_input]] | expression evaluations and reducer iterations | every consumer interprets the same row contract |
 
 ## Purpose
 

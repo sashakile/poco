@@ -1,5 +1,5 @@
 ---
-id: spec
+id: errors
 kind: intent
 statement: "THE system SHALL raise stable, structured, actionable public exceptions rooted in PocoError, translating internal failures with cause chaining"
 ---
@@ -10,13 +10,13 @@ statement: "THE system SHALL raise stable, structured, actionable public excepti
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| ce.taxonomy | invariant | The public taxonomy is rooted in `PocoError` and includes SchemaError, ColumnNotFoundError, NullValueError, IntegrityError, and UnsupportedOperationError as stable API | [[spec]] |
-| ce.diagnostics | invariant | Public exceptions expose `.code` (stable), `.message`, and `.details` with the minimum per-class fields (column/available_columns, operation, expected/actual, validate/side/join_keys, feature) | [[spec]] |
-| ce.message_quality | invariant | Messages state what happened, where, and the corrective action, without blame or required parsing | [[spec]] |
-| ce.boundary_translation | invariant | Internal container/library failures are translated into the taxonomy before crossing the API boundary; undocumented raw KeyError/IndexError never escape | [[spec]] |
-| ce.passthrough_documented | invariant | Only explicitly documented raw exceptions (e.g. ZeroDivisionError from user-authored arithmetic) pass through; undocumented runtime errors are wrapped into `PocoError` preserving the cause | [[spec]] |
-| ce.cause_chaining | invariant | Translation uses `raise ... from original` so `__cause__` retains the original exception | [[spec]] |
-| ce.spec_backed | invariant | Every public exception path has at least one OpenSpec scenario and one regression test | [[spec]] |
+| ce.taxonomy | invariant | The public taxonomy is rooted in `PocoError` and includes SchemaError, ColumnNotFoundError, NullValueError, IntegrityError, and UnsupportedOperationError as stable API | [[errors]] |
+| ce.diagnostics | invariant | Public exceptions expose `.code` (stable), `.message`, and `.details` with the minimum per-class fields (column/available_columns, operation, expected/actual, validate/side/join_keys, feature) | [[errors]] |
+| ce.message_quality | invariant | Messages state what happened, where, and the corrective action, without blame or required parsing | [[errors]] |
+| ce.boundary_translation | invariant | Internal container/library failures are translated into the taxonomy before crossing the API boundary; undocumented raw KeyError/IndexError never escape | [[errors]] |
+| ce.passthrough_documented | invariant | Only explicitly documented raw exceptions (e.g. ZeroDivisionError from user-authored arithmetic) pass through; undocumented runtime errors are wrapped into `PocoError` preserving the cause | [[errors]] |
+| ce.cause_chaining | invariant | Translation uses `raise ... from original` so `__cause__` retains the original exception | [[errors]] |
+| ce.spec_backed | invariant | Every public exception path has at least one OpenSpec scenario and one regression test | [[errors]] |
 
 ## Model
 
@@ -31,22 +31,22 @@ statement: "THE system SHALL raise stable, structured, actionable public excepti
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_translate | internal_failure | translated | [[spec.ce.boundary_translation]] |
-| t_passthrough | internal_failure | passed_through | [[spec.ce.passthrough_documented]] |
-| t_chain | translated | translated | [[spec.ce.cause_chaining]] |
-| t_report | translated | reported | [[spec.ce.diagnostics]] |
+| t_translate | internal_failure | translated | [[errors.ce.boundary_translation]] |
+| t_passthrough | internal_failure | passed_through | [[errors.ce.passthrough_documented]] |
+| t_chain | translated | translated | [[errors.ce.cause_chaining]] |
+| t_report | translated | reported | [[errors.ce.diagnostics]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.taxonomy | unit | [[spec.ce.taxonomy]] | documented failure modes | `except po.PocoError` catches all documented failures |
-| p.diagnostics | unit | [[spec.ce.diagnostics]] | raised public exceptions per class | code/message/details carry the required minimum fields |
-| p.message_quality | unit | [[spec.ce.message_quality]] | error messages across classes | messages are actionable and name column/operation plus remedy |
-| p.boundary_translation | unit | [[spec.ce.boundary_translation]] | internal lookup and validation failures | public APIs raise taxonomy classes, not raw containers' errors |
-| p.passthrough_documented | unit | [[spec.ce.passthrough_documented]] | division by zero and undocumented runtime errors | documented cases pass through; others wrap into PocoError |
-| p.cause_chaining | unit | [[spec.ce.cause_chaining]] | wrapped internal exceptions | `__cause__` exposes the original exception |
-| p.spec_backed | unit | [[spec.ce.spec_backed]] | public failure paths | each has a scenario and a regression test |
+| p.taxonomy | unit | [[errors.ce.taxonomy]] | documented failure modes | `except po.PocoError` catches all documented failures |
+| p.diagnostics | unit | [[errors.ce.diagnostics]] | raised public exceptions per class | code/message/details carry the required minimum fields |
+| p.message_quality | unit | [[errors.ce.message_quality]] | error messages across classes | messages are actionable and name column/operation plus remedy |
+| p.boundary_translation | unit | [[errors.ce.boundary_translation]] | internal lookup and validation failures | public APIs raise taxonomy classes, not raw containers' errors |
+| p.passthrough_documented | unit | [[errors.ce.passthrough_documented]] | division by zero and undocumented runtime errors | documented cases pass through; others wrap into PocoError |
+| p.cause_chaining | unit | [[errors.ce.cause_chaining]] | wrapped internal exceptions | `__cause__` exposes the original exception |
+| p.spec_backed | unit | [[errors.ce.spec_backed]] | public failure paths | each has a scenario and a regression test |
 
 ## Purpose
 

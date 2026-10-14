@@ -1,5 +1,5 @@
 ---
-id: spec
+id: relational
 kind: intent
 statement: "WHEN po.groupby is applied THE system SHALL return Fibers for bare grouping and a materializing step collapsing to a DataFrame with unconditionally retained fibration otherwise"
 ---
@@ -10,12 +10,12 @@ statement: "WHEN po.groupby is applied THE system SHALL return Fibers for bare g
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| rel.groupby_keys | invariant | `po.groupby` accepts direct ColumnRef keys plus named aggregation factories; computed key expressions require a prior `po.derive`; None keys group together and key columns are validated at pipe time with `SchemaError` | [[spec]] |
-| rel.bare_groupby_fibers | invariant | groupby with no aggregation kwargs returns a `Fibers` value (terminal for `\|`, not a DataFrame) whose per-key selections retain every source row | [[spec]] |
-| rel.aggregating_groupby | invariant | groupby with aggregations returns a materializing PipelineStep preserving `DataFrame \| step -> DataFrame`, carrying a Fibration ProvenanceTransform exposed as `.fibers` on the materialized result | [[spec]] |
-| rel.unconditional_retention | invariant | Fibration retention is unconditional — there is no per-call `keep_fibers` flag; any future memory knob is a global or per-backend setting | [[spec]] |
-| rel.aggregate_equivalence | invariant | `Fibers.aggregate(**named_reducers)` produces the same collapsed DataFrame as the aggregating groupby form, without re-executing any pre-groupby step | [[spec]] |
-| rel.name_collision | invariant | Key-aggregation name collisions raise `SchemaError` | [[spec]] |
+| rel.groupby_keys | invariant | `po.groupby` accepts direct ColumnRef keys plus named aggregation factories; computed key expressions require a prior `po.derive`; None keys group together and key columns are validated at pipe time with `SchemaError` | [[relational]] |
+| rel.bare_groupby_fibers | invariant | groupby with no aggregation kwargs returns a `Fibers` value (terminal for `\|`, not a DataFrame) whose per-key selections retain every source row | [[relational]] |
+| rel.aggregating_groupby | invariant | groupby with aggregations returns a materializing PipelineStep preserving `DataFrame \| step -> DataFrame`, carrying a Fibration ProvenanceTransform exposed as `.fibers` on the materialized result | [[relational]] |
+| rel.unconditional_retention | invariant | Fibration retention is unconditional — there is no per-call `keep_fibers` flag; any future memory knob is a global or per-backend setting | [[relational]] |
+| rel.aggregate_equivalence | invariant | `Fibers.aggregate(**named_reducers)` produces the same collapsed DataFrame as the aggregating groupby form, without re-executing any pre-groupby step | [[relational]] |
+| rel.name_collision | invariant | Key-aggregation name collisions raise `SchemaError` | [[relational]] |
 
 ## Model
 
@@ -29,22 +29,22 @@ statement: "WHEN po.groupby is applied THE system SHALL return Fibers for bare g
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_validate | ungrouped | ungrouped | [[spec.rel.groupby_keys]] |
-| t_bare | ungrouped | fibers_value | [[spec.rel.bare_groupby_fibers]] |
-| t_aggregate_form | ungrouped | collapsed | [[spec.rel.aggregating_groupby]] |
-| t_aggregate_method | fibers_value | collapsed | [[spec.rel.aggregate_equivalence]] |
-| t_reject_collision | ungrouped | ungrouped | [[spec.rel.name_collision]] |
+| t_validate | ungrouped | ungrouped | [[relational.rel.groupby_keys]] |
+| t_bare | ungrouped | fibers_value | [[relational.rel.bare_groupby_fibers]] |
+| t_aggregate_form | ungrouped | collapsed | [[relational.rel.aggregating_groupby]] |
+| t_aggregate_method | fibers_value | collapsed | [[relational.rel.aggregate_equivalence]] |
+| t_reject_collision | ungrouped | ungrouped | [[relational.rel.name_collision]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.groupby_keys | unit | [[spec.rel.groupby_keys]] | key expressions and frames with/without the key columns | validation errors at pipe time; None keys group together |
-| p.bare_groupby_fibers | unit | [[spec.rel.bare_groupby_fibers]] | bare groupby materializations | result is Fibers; per-key selections cover exactly the sharing source rows |
-| p.aggregating_groupby | unit | [[spec.rel.aggregating_groupby]] | groupby calls with aggregations | result preserves the endomorphism and exposes `.fibers` |
-| p.unconditional_retention | unit | [[spec.rel.unconditional_retention]] | all groupby forms | no keep_fibers flag exists; retention always holds |
-| p.aggregate_equivalence | unit | [[spec.rel.aggregate_equivalence]] | paired aggregating-groupby and Fibers.aggregate computations | results are equivalent; no pre-groupby step re-execution |
-| p.name_collision | unit | [[spec.rel.name_collision]] | groupby calls with colliding names | `SchemaError` is raised |
+| p.groupby_keys | unit | [[relational.rel.groupby_keys]] | key expressions and frames with/without the key columns | validation errors at pipe time; None keys group together |
+| p.bare_groupby_fibers | unit | [[relational.rel.bare_groupby_fibers]] | bare groupby materializations | result is Fibers; per-key selections cover exactly the sharing source rows |
+| p.aggregating_groupby | unit | [[relational.rel.aggregating_groupby]] | groupby calls with aggregations | result preserves the endomorphism and exposes `.fibers` |
+| p.unconditional_retention | unit | [[relational.rel.unconditional_retention]] | all groupby forms | no keep_fibers flag exists; retention always holds |
+| p.aggregate_equivalence | unit | [[relational.rel.aggregate_equivalence]] | paired aggregating-groupby and Fibers.aggregate computations | results are equivalent; no pre-groupby step re-execution |
+| p.name_collision | unit | [[relational.rel.name_collision]] | groupby calls with colliding names | `SchemaError` is raised |
 
 ## Purpose
 

@@ -1,5 +1,5 @@
 ---
-id: spec
+id: aggregation
 kind: intent
 statement: "THE system SHALL provide Expr-bound aggregation factories exposing required columns, preserving empty-input behavior and input result types, compatible with relational operations"
 ---
@@ -10,11 +10,11 @@ statement: "THE system SHALL provide Expr-bound aggregation factories exposing r
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| ag.factories | invariant | Aggregation factories are `sum_of`, `mean_of`, `min_of`, `max_of`, and `count_of`, combining a base reducer with column extraction from the shared row contract | [[spec]] |
-| ag.required_columns | invariant | Expr-bound aggregation reducers expose `required_columns` naming the columns referenced by their bound expression | [[spec]] |
-| ag.relational_compatible | invariant | Aggregations are usable by `groupby` and DataFrame-aware reduction without redefining reducer laws | [[spec]] |
-| ag.empty_input | invariant | Aggregations preserve the total/partial empty-input behavior of their wrapped reducer | [[spec]] |
-| ag.result_types | invariant | `sum_of` preserves int/float (bool→int); `mean_of` always returns float; `min_of`/`max_of` return the input type; `count_of` returns int | [[spec]] |
+| ag.factories | invariant | Aggregation factories are `sum_of`, `mean_of`, `min_of`, `max_of`, and `count_of`, combining a base reducer with column extraction from the shared row contract | [[aggregation]] |
+| ag.required_columns | invariant | Expr-bound aggregation reducers expose `required_columns` naming the columns referenced by their bound expression | [[aggregation]] |
+| ag.relational_compatible | invariant | Aggregations are usable by `groupby` and DataFrame-aware reduction without redefining reducer laws | [[aggregation]] |
+| ag.empty_input | invariant | Aggregations preserve the total/partial empty-input behavior of their wrapped reducer | [[aggregation]] |
+| ag.result_types | invariant | `sum_of` preserves int/float (bool→int); `mean_of` always returns float; `min_of`/`max_of` return the input type; `count_of` returns int | [[aggregation]] |
 
 ## Model
 
@@ -28,20 +28,20 @@ statement: "THE system SHALL provide Expr-bound aggregation factories exposing r
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_bind | bound | bound | [[spec.ag.required_columns]] |
-| t_extract | bound | extracting | [[spec.ag.factories]] |
-| t_complete | extracting | completed | [[spec.ag.result_types]] |
-| t_empty | extracting | completed | [[spec.ag.empty_input]] |
+| t_bind | bound | bound | [[aggregation.ag.required_columns]] |
+| t_extract | bound | extracting | [[aggregation.ag.factories]] |
+| t_complete | extracting | completed | [[aggregation.ag.result_types]] |
+| t_empty | extracting | completed | [[aggregation.ag.empty_input]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.factories | unit | [[spec.ag.factories]] | rows over the shared row contract | each factory extracts and reduces the bound column correctly |
-| p.required_columns | unit | [[spec.ag.required_columns]] | aggregations over compound expressions | required_columns is exactly the referenced column set |
-| p.relational_compatible | unit | [[spec.ag.relational_compatible]] | groupby calls with aggregation kwargs | aggregations consume extracted values within each group |
-| p.empty_input | unit | [[spec.ag.empty_input]] | empty inputs for total and partial reducers | behavior matches the wrapped reducer's |
-| p.result_types | unit | [[spec.ag.result_types]] | columns of each supported type | result types match the preservation table |
+| p.factories | unit | [[aggregation.ag.factories]] | rows over the shared row contract | each factory extracts and reduces the bound column correctly |
+| p.required_columns | unit | [[aggregation.ag.required_columns]] | aggregations over compound expressions | required_columns is exactly the referenced column set |
+| p.relational_compatible | unit | [[aggregation.ag.relational_compatible]] | groupby calls with aggregation kwargs | aggregations consume extracted values within each group |
+| p.empty_input | unit | [[aggregation.ag.empty_input]] | empty inputs for total and partial reducers | behavior matches the wrapped reducer's |
+| p.result_types | unit | [[aggregation.ag.result_types]] | columns of each supported type | result types match the preservation table |
 
 ## Purpose
 

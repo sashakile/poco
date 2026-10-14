@@ -1,5 +1,5 @@
 ---
-id: spec
+id: backend
 kind: intent
 statement: "THE system SHALL expose a Backend protocol with plan/supports/null_policy, backend-scoped NullPolicy, explicit capability negotiation with recorded fallback, and schema-strict pandas/polars import"
 ---
@@ -10,14 +10,14 @@ statement: "THE system SHALL expose a Backend protocol with plan/supports/null_p
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| backend.protocol_surface | invariant | A Backend exposes `plan(logical_ops)`, `supports(op)`, and `null_policy`; plan yields materialized rows for a LogicalOp chain | [[spec]] |
-| backend.default_python | invariant | Constructing a DataFrame with no `backend=` argument binds the pure-Python backend with `null_policy = NullPolicy.RAISE` | [[spec]] |
-| backend.null_policy_scoped | invariant | NullPolicy is a property of the Backend as a whole; a pipeline's null-handling behavior is fully determined by the executing backend | [[spec]] |
-| backend.raise_policy | invariant | Under NullPolicy.RAISE, a None reaching comparison or arithmetic raises `NullValueError`, matching expression/spec.md's unconditional behavior | [[spec]] |
-| backend.propagate_policy | invariant | Under NullPolicy.PROPAGATE, nulls propagate without raising and `df.explain()` indicates the active NullPolicy | [[spec]] |
-| backend.no_silent_fallback | invariant | Unsupported ops either raise `UnsupportedOperationError` (on_unsupported="raise") or execute via pure-Python with the fallback recorded in `explain()` (on_unsupported="fallback"); silent fallback never occurs | [[spec]] |
-| backend.import_rejects_unsupported_dtype | invariant | `from_pandas`/`from_polars` raise `SchemaError` naming the first column with a dtype outside `int \| float \| str \| bool` (or Optional thereof) rather than coercing | [[spec]] |
-| backend.import_rejects_invalid_names | invariant | Column names that are not valid Python identifiers or collide with keywords raise `SchemaError` unless an explicit `column_map` renames them | [[spec]] |
+| backend.protocol_surface | invariant | A Backend exposes `plan(logical_ops)`, `supports(op)`, and `null_policy`; plan yields materialized rows for a LogicalOp chain | [[backend]] |
+| backend.default_python | invariant | Constructing a DataFrame with no `backend=` argument binds the pure-Python backend with `null_policy = NullPolicy.RAISE` | [[backend]] |
+| backend.null_policy_scoped | invariant | NullPolicy is a property of the Backend as a whole; a pipeline's null-handling behavior is fully determined by the executing backend | [[backend]] |
+| backend.raise_policy | invariant | Under NullPolicy.RAISE, a None reaching comparison or arithmetic raises `NullValueError`, matching expression/spec.md's unconditional behavior | [[backend]] |
+| backend.propagate_policy | invariant | Under NullPolicy.PROPAGATE, nulls propagate without raising and `df.explain()` indicates the active NullPolicy | [[backend]] |
+| backend.no_silent_fallback | invariant | Unsupported ops either raise `UnsupportedOperationError` (on_unsupported="raise") or execute via pure-Python with the fallback recorded in `explain()` (on_unsupported="fallback"); silent fallback never occurs | [[backend]] |
+| backend.import_rejects_unsupported_dtype | invariant | `from_pandas`/`from_polars` raise `SchemaError` naming the first column with a dtype outside `int \| float \| str \| bool` (or Optional thereof) rather than coercing | [[backend]] |
+| backend.import_rejects_invalid_names | invariant | Column names that are not valid Python identifiers or collide with keywords raise `SchemaError` unless an explicit `column_map` renames them | [[backend]] |
 
 ## Model
 
@@ -33,26 +33,26 @@ statement: "THE system SHALL expose a Backend protocol with plan/supports/null_p
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_plan | constructed | planning | [[spec.backend.protocol_surface]] |
-| t_dispatch_native | planning | executing_native | [[spec.backend.no_silent_fallback]] |
-| t_dispatch_fallback | planning | executing_fallback | [[spec.backend.no_silent_fallback]] |
-| t_reject_import | constructed | rejected | [[spec.backend.import_rejects_unsupported_dtype]] |
-| t_reject_names | constructed | rejected | [[spec.backend.import_rejects_invalid_names]] |
-| t_raise_null | executing_native | rejected | [[spec.backend.raise_policy]] |
-| t_propagate_null | executing_native | executing_native | [[spec.backend.propagate_policy]] |
+| t_plan | constructed | planning | [[backend.backend.protocol_surface]] |
+| t_dispatch_native | planning | executing_native | [[backend.backend.no_silent_fallback]] |
+| t_dispatch_fallback | planning | executing_fallback | [[backend.backend.no_silent_fallback]] |
+| t_reject_import | constructed | rejected | [[backend.backend.import_rejects_unsupported_dtype]] |
+| t_reject_names | constructed | rejected | [[backend.backend.import_rejects_invalid_names]] |
+| t_raise_null | executing_native | rejected | [[backend.backend.raise_policy]] |
+| t_propagate_null | executing_native | executing_native | [[backend.backend.propagate_policy]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.protocol_surface | unit | [[spec.backend.protocol_surface]] | arbitrary LogicalOp chains | a conforming Backend's plan executes the chain and yields rows; supports and null_policy are inspectable |
-| p.default_python | unit | [[spec.backend.default_python]] | DataFrame constructor calls without backend= | the bound backend is the pure-Python backend with NullPolicy.RAISE |
-| p.null_policy_scoped | unit | [[spec.backend.null_policy_scoped]] | arbitrary backends and pipelines | null-handling behavior depends only on the executing backend's null_policy |
-| p.raise_policy | unit | [[spec.backend.raise_policy]] | rows with None reaching comparisons/arithmetic under RAISE | `NullValueError` is raised |
-| p.propagate_policy | unit | [[spec.backend.propagate_policy]] | rows with None under PROPAGATE | no raise; explain() reports the active NullPolicy |
-| p.no_silent_fallback | unit | [[spec.backend.no_silent_fallback]] | pipelines with unsupported ops under both on_unsupported settings | either the named error is raised or the fallback appears in explain(); never silent |
-| p.import_rejects_unsupported_dtype | unit | [[spec.backend.import_rejects_unsupported_dtype]] | pandas/polars frames with unsupported dtypes | `SchemaError` names the offending column and dtype |
-| p.import_rejects_invalid_names | unit | [[spec.backend.import_rejects_invalid_names]] | frames with non-identifier/keyword column names, with and without column_map | `SchemaError` without a map; successful rename with one |
+| p.protocol_surface | unit | [[backend.backend.protocol_surface]] | arbitrary LogicalOp chains | a conforming Backend's plan executes the chain and yields rows; supports and null_policy are inspectable |
+| p.default_python | unit | [[backend.backend.default_python]] | DataFrame constructor calls without backend= | the bound backend is the pure-Python backend with NullPolicy.RAISE |
+| p.null_policy_scoped | unit | [[backend.backend.null_policy_scoped]] | arbitrary backends and pipelines | null-handling behavior depends only on the executing backend's null_policy |
+| p.raise_policy | unit | [[backend.backend.raise_policy]] | rows with None reaching comparisons/arithmetic under RAISE | `NullValueError` is raised |
+| p.propagate_policy | unit | [[backend.backend.propagate_policy]] | rows with None under PROPAGATE | no raise; explain() reports the active NullPolicy |
+| p.no_silent_fallback | unit | [[backend.backend.no_silent_fallback]] | pipelines with unsupported ops under both on_unsupported settings | either the named error is raised or the fallback appears in explain(); never silent |
+| p.import_rejects_unsupported_dtype | unit | [[backend.backend.import_rejects_unsupported_dtype]] | pandas/polars frames with unsupported dtypes | `SchemaError` names the offending column and dtype |
+| p.import_rejects_invalid_names | unit | [[backend.backend.import_rejects_invalid_names]] | frames with non-identifier/keyword column names, with and without column_map | `SchemaError` without a map; successful rename with one |
 
 ## Purpose
 

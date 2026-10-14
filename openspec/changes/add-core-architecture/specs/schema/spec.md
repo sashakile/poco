@@ -1,5 +1,5 @@
 ---
-id: spec
+id: schema
 kind: intent
 statement: "THE system SHALL define schemas via a dataclass-implying decorator with declared, inferred, and inherited forms that constrain types, names, ordering, and code generation"
 ---
@@ -10,17 +10,17 @@ statement: "THE system SHALL define schemas via a dataclass-implying decorator w
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| cs.decorator | invariant | `@po.schema` implies `@dataclass`: class-level field access returns Expr nodes, instance access returns values, dataclass init/repr/eq and `dataclasses.fields()` are preserved | [[spec]] |
-| cs.runtime_object | invariant | A runtime schema is a declared or dynamically created `@po.schema` class; class-level access returns Exprs in both cases | [[spec]] |
-| cs.inference | invariant | Schemas are inferred from dict or row data as dynamic schema classes; incompatible type mixes, unsupported homogeneous types, and all-None columns raise `SchemaError` with suggestions | [[spec]] |
-| cs.numeric_promotion | invariant | Compatible numerics promote along `bool < int < float`, orthogonal to nullability (None yields the Optional variant); NaN is a valid float, not None | [[spec]] |
-| cs.supported_types | invariant | Column dtypes are `int`, `float`, `str`, `bool`, and their Optional variants; unsupported declared types raise `SchemaError` at decoration naming the type and supported set | [[spec]] |
-| cs.name_constraints | invariant | Column names must be valid Python identifiers and not keywords; violations raise `SchemaError` | [[spec]] |
-| cs.to_code | invariant | `schema.to_code()` returns a valid `@po.schema` class definition equivalent to the schema, including the import | [[spec]] |
-| cs.subclassing | invariant | Single inheritance merges parent-then-child fields; overrides must restate the exact type; type-changing overrides and diamond inheritance raise `SchemaError` | [[spec]] |
-| cs.zero_field | invariant | A zero-field schema is valid and consistent with empty DataFrame construction | [[spec]] |
-| cs.field_ordering | invariant | Field order is deterministic: declaration order, parent-then-child, first-dict/row insertion order for inference, and operation-defined order for auto-generated schemas; row keys always match schema order | [[spec]] |
-| cs.cross_family | invariant | Promotion applies only within the numeric family; numeric+str mixes raise `SchemaError`; all-bool stays bool | [[spec]] |
+| cs.decorator | invariant | `@po.schema` implies `@dataclass`: class-level field access returns Expr nodes, instance access returns values, dataclass init/repr/eq and `dataclasses.fields()` are preserved | [[schema]] |
+| cs.runtime_object | invariant | A runtime schema is a declared or dynamically created `@po.schema` class; class-level access returns Exprs in both cases | [[schema]] |
+| cs.inference | invariant | Schemas are inferred from dict or row data as dynamic schema classes; incompatible type mixes, unsupported homogeneous types, and all-None columns raise `SchemaError` with suggestions | [[schema]] |
+| cs.numeric_promotion | invariant | Compatible numerics promote along `bool < int < float`, orthogonal to nullability (None yields the Optional variant); NaN is a valid float, not None | [[schema]] |
+| cs.supported_types | invariant | Column dtypes are `int`, `float`, `str`, `bool`, and their Optional variants; unsupported declared types raise `SchemaError` at decoration naming the type and supported set | [[schema]] |
+| cs.name_constraints | invariant | Column names must be valid Python identifiers and not keywords; violations raise `SchemaError` | [[schema]] |
+| cs.to_code | invariant | `schema.to_code()` returns a valid `@po.schema` class definition equivalent to the schema, including the import | [[schema]] |
+| cs.subclassing | invariant | Single inheritance merges parent-then-child fields; overrides must restate the exact type; type-changing overrides and diamond inheritance raise `SchemaError` | [[schema]] |
+| cs.zero_field | invariant | A zero-field schema is valid and consistent with empty DataFrame construction | [[schema]] |
+| cs.field_ordering | invariant | Field order is deterministic: declaration order, parent-then-child, first-dict/row insertion order for inference, and operation-defined order for auto-generated schemas; row keys always match schema order | [[schema]] |
+| cs.cross_family | invariant | Promotion applies only within the numeric family; numeric+str mixes raise `SchemaError`; all-bool stays bool | [[schema]] |
 
 ## Model
 
@@ -35,28 +35,28 @@ statement: "THE system SHALL define schemas via a dataclass-implying decorator w
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_declare | undeclared | declared | [[spec.cs.supported_types]] |
-| t_infer | undeclared | inferred | [[spec.cs.numeric_promotion]] |
-| t_reject_family | inferred | rejected | [[spec.cs.cross_family]] |
-| t_reject_names | undeclared | rejected | [[spec.cs.name_constraints]] |
-| t_subclass | declared | declared | [[spec.cs.subclassing]] |
-| t_codegen | declared | declared | [[spec.cs.to_code]] |
+| t_declare | undeclared | declared | [[schema.cs.supported_types]] |
+| t_infer | undeclared | inferred | [[schema.cs.numeric_promotion]] |
+| t_reject_family | inferred | rejected | [[schema.cs.cross_family]] |
+| t_reject_names | undeclared | rejected | [[schema.cs.name_constraints]] |
+| t_subclass | declared | declared | [[schema.cs.subclassing]] |
+| t_codegen | declared | declared | [[schema.cs.to_code]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.decorator | unit | [[spec.cs.decorator]] | schema classes accessed at class and instance level | class access yields ColumnRef Exprs; instance access yields values; dataclass behavior holds |
-| p.runtime_object | unit | [[spec.cs.runtime_object]] | declared and dynamic schemas | both expose Exprs on class-level access |
-| p.inference | unit | [[spec.cs.inference]] | dict and row data including invalid mixes | inferred schemas match fields; invalid data raises the specified SchemaErrors |
-| p.numeric_promotion | unit | [[spec.cs.numeric_promotion]] | numeric columns with mixed widths, None, and NaN | widest promotion with correct Optional application |
-| p.supported_types | unit | [[spec.cs.supported_types]] | declarations over supported and unsupported types | unsupported types raise at decoration; Optional variants accepted |
-| p.name_constraints | unit | [[spec.cs.name_constraints]] | column names with spaces, keywords, leading digits | `SchemaError` for each violation class |
-| p.to_code | unit | [[spec.cs.to_code]] | inferred schemas round-tripped through exec | generated code reproduces an equivalent schema |
-| p.subclassing | unit | [[spec.cs.subclassing]] | subclass declarations including overrides and diamonds | merging, override, and diamond rules hold |
-| p.zero_field | unit | [[spec.cs.zero_field]] | empty schema declarations and empty DataFrames | zero-column schemas construct and iterate |
-| p.field_ordering | unit | [[spec.cs.field_ordering]] | declared, inherited, inferred, and generated schemas | field order follows the deterministic rules |
-| p.cross_family | unit | [[spec.cs.cross_family]] | mixed numeric/str/bool columns | cross-family mixes raise; all-bool stays bool |
+| p.decorator | unit | [[schema.cs.decorator]] | schema classes accessed at class and instance level | class access yields ColumnRef Exprs; instance access yields values; dataclass behavior holds |
+| p.runtime_object | unit | [[schema.cs.runtime_object]] | declared and dynamic schemas | both expose Exprs on class-level access |
+| p.inference | unit | [[schema.cs.inference]] | dict and row data including invalid mixes | inferred schemas match fields; invalid data raises the specified SchemaErrors |
+| p.numeric_promotion | unit | [[schema.cs.numeric_promotion]] | numeric columns with mixed widths, None, and NaN | widest promotion with correct Optional application |
+| p.supported_types | unit | [[schema.cs.supported_types]] | declarations over supported and unsupported types | unsupported types raise at decoration; Optional variants accepted |
+| p.name_constraints | unit | [[schema.cs.name_constraints]] | column names with spaces, keywords, leading digits | `SchemaError` for each violation class |
+| p.to_code | unit | [[schema.cs.to_code]] | inferred schemas round-tripped through exec | generated code reproduces an equivalent schema |
+| p.subclassing | unit | [[schema.cs.subclassing]] | subclass declarations including overrides and diamonds | merging, override, and diamond rules hold |
+| p.zero_field | unit | [[schema.cs.zero_field]] | empty schema declarations and empty DataFrames | zero-column schemas construct and iterate |
+| p.field_ordering | unit | [[schema.cs.field_ordering]] | declared, inherited, inferred, and generated schemas | field order follows the deterministic rules |
+| p.cross_family | unit | [[schema.cs.cross_family]] | mixed numeric/str/bool columns | cross-family mixes raise; all-bool stays bool |
 
 ## Purpose
 

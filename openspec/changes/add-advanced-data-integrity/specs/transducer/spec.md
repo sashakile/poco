@@ -1,5 +1,5 @@
 ---
-id: spec
+id: transducer
 kind: intent
 statement: "WHEN distinct is configured with ttl or max_seen THE system SHALL evict seen keys under LRU policy and SHALL be exempt from the determinism law"
 ---
@@ -10,11 +10,11 @@ statement: "WHEN distinct is configured with ttl or max_seen THE system SHALL ev
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| td.distinct_unique | invariant | `distinct(*exprs, ttl, max_seen)` passes only rows with unique key values | [[spec]] |
-| td.distinct_eviction | invariant | `ttl` evicts keys older than N seconds; `max_seen` bounds the seen-set at N entries with least-recently-seen LRU eviction | [[spec]] |
-| td.distinct_unbounded_default | invariant | Without ttl or max_seen the seen-set is unbounded, growing with unique key count; documentation states the memory-growth caveat | [[spec]] |
-| td.ttl_nondeterministic | invariant | `distinct(ttl=N)` depends on wall-clock time and is documented as non-deterministic; it is exempt from the reducer determinism law only | [[spec]] |
-| td.ttl_other_laws | invariant | TTL-parameterized transducers still satisfy init preservation, complete propagation, and Reduced propagation; their property tests assert only the non-determinism-independent laws | [[spec]] |
+| td.distinct_unique | invariant | `distinct(*exprs, ttl, max_seen)` passes only rows with unique key values | [[transducer]] |
+| td.distinct_eviction | invariant | `ttl` evicts keys older than N seconds; `max_seen` bounds the seen-set at N entries with least-recently-seen LRU eviction | [[transducer]] |
+| td.distinct_unbounded_default | invariant | Without ttl or max_seen the seen-set is unbounded, growing with unique key count; documentation states the memory-growth caveat | [[transducer]] |
+| td.ttl_nondeterministic | invariant | `distinct(ttl=N)` depends on wall-clock time and is documented as non-deterministic; it is exempt from the reducer determinism law only | [[transducer]] |
+| td.ttl_other_laws | invariant | TTL-parameterized transducers still satisfy init preservation, complete propagation, and Reduced propagation; their property tests assert only the non-determinism-independent laws | [[transducer]] |
 
 ## Model
 
@@ -28,20 +28,20 @@ statement: "WHEN distinct is configured with ttl or max_seen THE system SHALL ev
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_pass | unseen | seen | [[spec.td.distinct_unique]] |
-| t_duplicate | seen | seen | [[spec.td.distinct_unique]] |
-| t_evict | seen | evicted | [[spec.td.distinct_eviction]] |
-| t_reappear | evicted | unseen | [[spec.td.distinct_eviction]] |
+| t_pass | unseen | seen | [[transducer.td.distinct_unique]] |
+| t_duplicate | seen | seen | [[transducer.td.distinct_unique]] |
+| t_evict | seen | evicted | [[transducer.td.distinct_eviction]] |
+| t_reappear | evicted | unseen | [[transducer.td.distinct_eviction]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.distinct_unique | unit | [[spec.td.distinct_unique]] | streams with duplicate and unique keys | only first occurrence of each key passes |
-| p.distinct_eviction | unit | [[spec.td.distinct_eviction]] | key streams crossing ttl/max_seen thresholds | eviction frees the expected keys; evicted keys may reappear |
-| p.distinct_unbounded_default | unit | [[spec.td.distinct_unbounded_default]] | distinct calls without bounds | the seen-set grows with unique keys and docs state it |
-| p.ttl_nondeterministic | unit | [[spec.td.ttl_nondeterministic]] | same data at different execution speeds | slow and fast executions may differ; no determinism assertion is made |
-| p.ttl_other_laws | unit | [[spec.td.ttl_other_laws]] | TTL transducers under the compatibility laws | init/complete/Reduced laws hold for TTL transducers |
+| p.distinct_unique | unit | [[transducer.td.distinct_unique]] | streams with duplicate and unique keys | only first occurrence of each key passes |
+| p.distinct_eviction | unit | [[transducer.td.distinct_eviction]] | key streams crossing ttl/max_seen thresholds | eviction frees the expected keys; evicted keys may reappear |
+| p.distinct_unbounded_default | unit | [[transducer.td.distinct_unbounded_default]] | distinct calls without bounds | the seen-set grows with unique keys and docs state it |
+| p.ttl_nondeterministic | unit | [[transducer.td.ttl_nondeterministic]] | same data at different execution speeds | slow and fast executions may differ; no determinism assertion is made |
+| p.ttl_other_laws | unit | [[transducer.td.ttl_other_laws]] | TTL transducers under the compatibility laws | init/complete/Reduced laws hold for TTL transducers |
 
 ## Purpose
 

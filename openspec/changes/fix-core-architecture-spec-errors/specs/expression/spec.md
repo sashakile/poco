@@ -1,5 +1,5 @@
 ---
-id: spec
+id: expression
 kind: intent
 statement: "THE system SHALL make Expr equality and protocol misuse explicit so __eq__ builds expressions, boolean and hash contexts raise InvalidExprUsageError, and type inference follows the decision table"
 ---
@@ -10,10 +10,10 @@ statement: "THE system SHALL make Expr equality and protocol misuse explicit so 
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| fe.eq_returns_expr | invariant | `Expr.__eq__` returns a `BinOp(EQ, ...)` expression, never bool; `.equals(other)` provides structural bool comparison; collections like `required_columns` store column-name strings, not Exprs | [[spec]] |
-| fe.unhashable_expr | invariant | `Expr.__hash__` is an explicit method raising `InvalidExprUsageError` (not `__hash__ = None`), catchable via both `TypeError` and `PocoError`, with the unhashability guidance message | [[spec]] |
-| fe.bool_context | invariant | `Expr.__bool__` raises `InvalidExprUsageError` with the `.equals()`/`po.where()` guidance message in any boolean context | [[spec]] |
-| fe.type_inference_table | invariant | Arithmetic and comparison result types follow the decision tables: numeric promotions with bool→int, `str + str` concatenation only, `/` always float, no floor division; invalid combinations raise `SchemaError` at construction | [[spec]] |
+| fe.eq_returns_expr | invariant | `Expr.__eq__` returns a `BinOp(EQ, ...)` expression, never bool; `.equals(other)` provides structural bool comparison; collections like `required_columns` store column-name strings, not Exprs | [[expression]] |
+| fe.unhashable_expr | invariant | `Expr.__hash__` is an explicit method raising `InvalidExprUsageError` (not `__hash__ = None`), catchable via both `TypeError` and `PocoError`, with the unhashability guidance message | [[expression]] |
+| fe.bool_context | invariant | `Expr.__bool__` raises `InvalidExprUsageError` with the `.equals()`/`po.where()` guidance message in any boolean context | [[expression]] |
+| fe.type_inference_table | invariant | Arithmetic and comparison result types follow the decision tables: numeric promotions with bool→int, `str + str` concatenation only, `/` always float, no floor division; invalid combinations raise `SchemaError` at construction | [[expression]] |
 
 ## Model
 
@@ -27,20 +27,20 @@ statement: "THE system SHALL make Expr equality and protocol misuse explicit so 
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_eq | expression | expression | [[spec.fe.eq_returns_expr]] |
-| t_equals | expression | compared | [[spec.fe.eq_returns_expr]] |
-| t_hash_misuse | expression | misused | [[spec.fe.unhashable_expr]] |
-| t_bool_misuse | expression | misused | [[spec.fe.bool_context]] |
-| t_infer | expression | expression | [[spec.fe.type_inference_table]] |
+| t_eq | expression | expression | [[expression.fe.eq_returns_expr]] |
+| t_equals | expression | compared | [[expression.fe.eq_returns_expr]] |
+| t_hash_misuse | expression | misused | [[expression.fe.unhashable_expr]] |
+| t_bool_misuse | expression | misused | [[expression.fe.bool_context]] |
+| t_infer | expression | expression | [[expression.fe.type_inference_table]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.eq_returns_expr | unit | [[spec.fe.eq_returns_expr]] | comparison expressions over schema classes | `==` builds BinOp(EQ); `.equals` returns a Python bool |
-| p.unhashable_expr | unit | [[spec.fe.unhashable_expr]] | dict-key and set-member usage of Exprs | `InvalidExprUsageError` with guidance, dual-catchable |
-| p.bool_context | unit | [[spec.fe.bool_context]] | if/assert usage of Exprs | `InvalidExprUsageError` with the specified message |
-| p.type_inference_table | unit | [[spec.fe.type_inference_table]] | every cell of the arithmetic and comparison tables | result types match the table; invalid cells raise `SchemaError` |
+| p.eq_returns_expr | unit | [[expression.fe.eq_returns_expr]] | comparison expressions over schema classes | `==` builds BinOp(EQ); `.equals` returns a Python bool |
+| p.unhashable_expr | unit | [[expression.fe.unhashable_expr]] | dict-key and set-member usage of Exprs | `InvalidExprUsageError` with guidance, dual-catchable |
+| p.bool_context | unit | [[expression.fe.bool_context]] | if/assert usage of Exprs | `InvalidExprUsageError` with the specified message |
+| p.type_inference_table | unit | [[expression.fe.type_inference_table]] | every cell of the arithmetic and comparison tables | result types match the table; invalid cells raise `SchemaError` |
 
 ## Purpose
 

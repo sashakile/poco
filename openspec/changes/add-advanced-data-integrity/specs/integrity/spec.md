@@ -1,5 +1,5 @@
 ---
-id: spec
+id: integrity
 kind: intent
 statement: "THE system SHALL provide integrity operations for gap detection, monotonicity checking, stable sorting, and ordered diff expressions that raise IntegrityError with pipeline context"
 ---
@@ -10,12 +10,12 @@ statement: "THE system SHALL provide integrity operations for gap detection, mon
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| integrity.detect_gaps | invariant | `detect_gaps(expr, threshold)` returns a materializing step adding `is_gap: bool` via Extend, preserving all input columns, comparing each value to the previous in current order | [[spec]] |
-| integrity.is_monotonic | invariant | `is_monotonic(expr, increasing, strict)` raises `IntegrityError` on violation of the four increasing/strict combinations | [[spec]] |
-| integrity.stable_sort | invariant | `po.sort_by` is stable: equal-key rows preserve source relative order | [[spec]] |
-| integrity.diff_scope | invariant | `expr.diff()` is valid only inside ordered materializing steps; plain `derive` rejects it; non-numeric columns raise `SchemaError` at construction; first row and None operands evaluate to None; result type matches input type | [[spec]] |
-| integrity.error_context | invariant | IntegrityError from is_monotonic/detect_gaps carries operation name, 0-based row index, actual value, and expected constraint, with machine-readable `.details` fields | [[spec]] |
-| integrity.gaps_none_handling | invariant | detect_gaps's first row is baseline with `is_gap=False`; a None first value raises `IntegrityError`; a later None emits `is_gap=True` and preserves the last non-None baseline | [[spec]] |
+| integrity.detect_gaps | invariant | `detect_gaps(expr, threshold)` returns a materializing step adding `is_gap: bool` via Extend, preserving all input columns, comparing each value to the previous in current order | [[integrity]] |
+| integrity.is_monotonic | invariant | `is_monotonic(expr, increasing, strict)` raises `IntegrityError` on violation of the four increasing/strict combinations | [[integrity]] |
+| integrity.stable_sort | invariant | `po.sort_by` is stable: equal-key rows preserve source relative order | [[integrity]] |
+| integrity.diff_scope | invariant | `expr.diff()` is valid only inside ordered materializing steps; plain `derive` rejects it; non-numeric columns raise `SchemaError` at construction; first row and None operands evaluate to None; result type matches input type | [[integrity]] |
+| integrity.error_context | invariant | IntegrityError from is_monotonic/detect_gaps carries operation name, 0-based row index, actual value, and expected constraint, with machine-readable `.details` fields | [[integrity]] |
+| integrity.gaps_none_handling | invariant | detect_gaps's first row is baseline with `is_gap=False`; a None first value raises `IntegrityError`; a later None emits `is_gap=True` and preserves the last non-None baseline | [[integrity]] |
 
 ## Model
 
@@ -30,22 +30,22 @@ statement: "THE system SHALL provide integrity operations for gap detection, mon
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_construct | constructed | constructed | [[spec.integrity.diff_scope]] |
-| t_order | constructed | ordering | [[spec.integrity.stable_sort]] |
-| t_compare | ordering | comparing | [[spec.integrity.detect_gaps]] |
-| t_baseline | comparing | comparing | [[spec.integrity.gaps_none_handling]] |
-| t_violate | comparing | violated | [[spec.integrity.is_monotonic]] |
+| t_construct | constructed | constructed | [[integrity.integrity.diff_scope]] |
+| t_order | constructed | ordering | [[integrity.integrity.stable_sort]] |
+| t_compare | ordering | comparing | [[integrity.integrity.detect_gaps]] |
+| t_baseline | comparing | comparing | [[integrity.integrity.gaps_none_handling]] |
+| t_violate | comparing | violated | [[integrity.integrity.is_monotonic]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.detect_gaps | unit | [[spec.integrity.detect_gaps]] | timestamp sequences with thresholds | is_gap flags match threshold comparison against the previous value |
-| p.is_monotonic | unit | [[spec.integrity.is_monotonic]] | sequences violating each of the four mode combinations | `IntegrityError` is raised at the first violating row |
-| p.stable_sort | unit | [[spec.integrity.stable_sort]] | rows with duplicate sort keys | relative source order is preserved |
-| p.diff_scope | unit | [[spec.integrity.diff_scope]] | diff usage inside and outside ordered steps, numeric and non-numeric columns | valid uses compute differences; invalid uses raise the specified errors |
-| p.error_context | unit | [[spec.integrity.error_context]] | violations at known row indices | error message and `.details` carry operation, row_index, actual, constraint |
-| p.gaps_none_handling | unit | [[spec.integrity.gaps_none_handling]] | sequences with None in first and later positions | baseline/error/is_gap behavior matches the None rules |
+| p.detect_gaps | unit | [[integrity.integrity.detect_gaps]] | timestamp sequences with thresholds | is_gap flags match threshold comparison against the previous value |
+| p.is_monotonic | unit | [[integrity.integrity.is_monotonic]] | sequences violating each of the four mode combinations | `IntegrityError` is raised at the first violating row |
+| p.stable_sort | unit | [[integrity.integrity.stable_sort]] | rows with duplicate sort keys | relative source order is preserved |
+| p.diff_scope | unit | [[integrity.integrity.diff_scope]] | diff usage inside and outside ordered steps, numeric and non-numeric columns | valid uses compute differences; invalid uses raise the specified errors |
+| p.error_context | unit | [[integrity.integrity.error_context]] | violations at known row indices | error message and `.details` carry operation, row_index, actual, constraint |
+| p.gaps_none_handling | unit | [[integrity.integrity.gaps_none_handling]] | sequences with None in first and later positions | baseline/error/is_gap behavior matches the None rules |
 
 ## Purpose
 

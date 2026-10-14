@@ -1,5 +1,5 @@
 ---
-id: spec
+id: pipeline
 kind: intent
 statement: "WHEN a pipeline step is created THE system SHALL construct it only through validated factories whose step carries a LogicalOp, a pure-Python lowering, and a zero-cost ProvenanceTransform composed by pullback"
 ---
@@ -10,11 +10,11 @@ statement: "WHEN a pipeline step is created THE system SHALL construct it only t
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| pp.factory_only | invariant | PipelineStep has no public constructor accepting arbitrary pairs; steps are created only via validated factories and `\|` | [[spec]] |
-| pp.dual_representation | invariant | Every step's DataOp carries a sealed backend-neutral LogicalOp plus a pure-Python lowering (StreamingOp or MaterializingOp); streaming steps stream, materializing steps materialize | [[spec]] |
-| pp.provenance_component | invariant | Each factory attaches a ProvenanceTransform computed at construction time from the same information as SchemaTransform, without touching row data, as an optional third component | [[spec]] |
-| pp.composition | invariant | `\|` composition preserves materializing dominance, concatenates LogicalOps in pipe order, and pullback-composes ProvenanceTransforms | [[spec]] |
-| pp.rule_provenance_zero_cost | invariant | Pipelines whose provenance is only Bijection/Injection rules materialize no per-row provenance storage and behave identically to add-core-architecture | [[spec]] |
+| pp.factory_only | invariant | PipelineStep has no public constructor accepting arbitrary pairs; steps are created only via validated factories and `\|` | [[pipeline]] |
+| pp.dual_representation | invariant | Every step's DataOp carries a sealed backend-neutral LogicalOp plus a pure-Python lowering (StreamingOp or MaterializingOp); streaming steps stream, materializing steps materialize | [[pipeline]] |
+| pp.provenance_component | invariant | Each factory attaches a ProvenanceTransform computed at construction time from the same information as SchemaTransform, without touching row data, as an optional third component | [[pipeline]] |
+| pp.composition | invariant | `\|` composition preserves materializing dominance, concatenates LogicalOps in pipe order, and pullback-composes ProvenanceTransforms | [[pipeline]] |
+| pp.rule_provenance_zero_cost | invariant | Pipelines whose provenance is only Bijection/Injection rules materialize no per-row provenance storage and behave identically to add-core-architecture | [[pipeline]] |
 
 ## Model
 
@@ -28,20 +28,20 @@ statement: "WHEN a pipeline step is created THE system SHALL construct it only t
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_factory | unconstructed | factory_built | [[spec.pp.factory_only]] |
-| t_attach | factory_built | factory_built | [[spec.pp.provenance_component]] |
-| t_compose | factory_built | composed | [[spec.pp.composition]] |
-| t_zero_cost | composed | composed | [[spec.pp.rule_provenance_zero_cost]] |
+| t_factory | unconstructed | factory_built | [[pipeline.pp.factory_only]] |
+| t_attach | factory_built | factory_built | [[pipeline.pp.provenance_component]] |
+| t_compose | factory_built | composed | [[pipeline.pp.composition]] |
+| t_zero_cost | composed | composed | [[pipeline.pp.rule_provenance_zero_cost]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.factory_only | unit | [[spec.pp.factory_only]] | arbitrary factory calls | steps are only obtainable via factories and `\|` |
-| p.dual_representation | unit | [[spec.pp.dual_representation]] | steps from every factory | LogicalOp plus correct lowering are attached |
-| p.provenance_component | unit | [[spec.pp.provenance_component]] | steps from every factory | a correct ProvenanceTransform is attached without touching row data |
-| p.composition | unit | [[spec.pp.composition]] | pairs of steps composed with `\|` | dominance, LogicalOp concatenation, and pullback composition hold |
-| p.rule_provenance_zero_cost | unit | [[spec.pp.rule_provenance_zero_cost]] | rule-only pipelines vs core-architecture baselines | outputs are identical and no per-row provenance storage exists |
+| p.factory_only | unit | [[pipeline.pp.factory_only]] | arbitrary factory calls | steps are only obtainable via factories and `\|` |
+| p.dual_representation | unit | [[pipeline.pp.dual_representation]] | steps from every factory | LogicalOp plus correct lowering are attached |
+| p.provenance_component | unit | [[pipeline.pp.provenance_component]] | steps from every factory | a correct ProvenanceTransform is attached without touching row data |
+| p.composition | unit | [[pipeline.pp.composition]] | pairs of steps composed with `\|` | dominance, LogicalOp concatenation, and pullback composition hold |
+| p.rule_provenance_zero_cost | unit | [[pipeline.pp.rule_provenance_zero_cost]] | rule-only pipelines vs core-architecture baselines | outputs are identical and no per-row provenance storage exists |
 
 ## Purpose
 

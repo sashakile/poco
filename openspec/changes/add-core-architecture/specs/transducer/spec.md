@@ -1,5 +1,5 @@
 ---
-id: spec
+id: transducer
 kind: intent
 statement: "THE system SHALL transform reducers via composable left-to-right transducers whose wrapping is fresh, reusable, law-abiding, and completes outermost-first"
 ---
@@ -10,14 +10,14 @@ statement: "THE system SHALL transform reducers via composable left-to-right tra
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| ct.transformer | invariant | A transducer is a callable transforming one reducer into another, wrapping all three phases, operating on the shared row contract in pipelines; each reduce call re-wraps freshly | [[spec]] |
-| ct.compatibility_laws | invariant | Transducers preserve init by default, propagate complete to the inner reducer, and propagate Reduced from inner step | [[spec]] |
-| ct.composition | invariant | `xf1 \| xf2` applies xf1 first (left-to-right data flow, right-to-left function composition) and composition is associative | [[spec]] |
-| ct.identity | invariant | An identity transducer is the neutral element of composition; `comp()` with no arguments returns it | [[spec]] |
-| ct.core_builtins | invariant | Core transducers are `filtering`, `mapping`, `taking`, and `dropping`; taking/dropping validate n (`ValueError` on negative) and terminate early via Reduced | [[spec]] |
-| ct.fresh_state | invariant | Each wrapping produces fresh independent closure state; transducer values are stateless and reusable across wrappings and pipelines | [[spec]] |
-| ct.complete_order | invariant | In composed transducers, complete() propagates outermost-first, each layer seeing its own accumulator state, buffering layers flushing before propagating inward | [[spec]] |
-| ct.state_independence_tested | invariant | Property-based tests verify stateful transducers (taking, dropping, distinct) produce identical results on repeated applications | [[spec]] |
+| ct.transformer | invariant | A transducer is a callable transforming one reducer into another, wrapping all three phases, operating on the shared row contract in pipelines; each reduce call re-wraps freshly | [[transducer]] |
+| ct.compatibility_laws | invariant | Transducers preserve init by default, propagate complete to the inner reducer, and propagate Reduced from inner step | [[transducer]] |
+| ct.composition | invariant | `xf1 \| xf2` applies xf1 first (left-to-right data flow, right-to-left function composition) and composition is associative | [[transducer]] |
+| ct.identity | invariant | An identity transducer is the neutral element of composition; `comp()` with no arguments returns it | [[transducer]] |
+| ct.core_builtins | invariant | Core transducers are `filtering`, `mapping`, `taking`, and `dropping`; taking/dropping validate n (`ValueError` on negative) and terminate early via Reduced | [[transducer]] |
+| ct.fresh_state | invariant | Each wrapping produces fresh independent closure state; transducer values are stateless and reusable across wrappings and pipelines | [[transducer]] |
+| ct.complete_order | invariant | In composed transducers, complete() propagates outermost-first, each layer seeing its own accumulator state, buffering layers flushing before propagating inward | [[transducer]] |
+| ct.state_independence_tested | invariant | Property-based tests verify stateful transducers (taking, dropping, distinct) produce identical results on repeated applications | [[transducer]] |
 
 ## Model
 
@@ -32,24 +32,24 @@ statement: "THE system SHALL transform reducers via composable left-to-right tra
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_wrap | factory | wrapped | [[spec.ct.fresh_state]] |
-| t_step | wrapped | stepping | [[spec.ct.compatibility_laws]] |
-| t_compose | factory | factory | [[spec.ct.composition]] |
-| t_identity | factory | factory | [[spec.ct.identity]] |
-| t_terminate | stepping | terminated | [[spec.ct.core_builtins]] |
+| t_wrap | factory | wrapped | [[transducer.ct.fresh_state]] |
+| t_step | wrapped | stepping | [[transducer.ct.compatibility_laws]] |
+| t_compose | factory | factory | [[transducer.ct.composition]] |
+| t_identity | factory | factory | [[transducer.ct.identity]] |
+| t_terminate | stepping | terminated | [[transducer.ct.core_builtins]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.transformer | unit | [[spec.ct.transformer]] | wrapping calls of filtering/mapping over to_list | only matching or transformed items accumulate; re-wrapping is fresh |
-| p.compatibility_laws | law | [[spec.ct.compatibility_laws]] | transducers over reducers | identity: init is preserved; associativity: complete/Reduced propagate through any nesting |
-| p.composition | unit | [[spec.ct.composition]] | transducer triples composed both groupings | left-to-right data flow holds and both groupings agree |
-| p.identity | unit | [[spec.ct.identity]] | compositions with and without identity | identity is neutral on both sides |
-| p.core_builtins | unit | [[spec.ct.core_builtins]] | taking/dropping over varied n and inputs | slicing semantics, zero cases, negative-n errors, and early termination hold |
-| p.fresh_state | unit | [[spec.ct.fresh_state]] | reusable transducer values applied multiple times | each wrapping tracks independent state; reuse never leaks state |
-| p.complete_order | unit | [[spec.ct.complete_order]] | composed transducers with buffered layers | complete order is outermost-first with flushing before inward propagation |
-| p.state_independence_tested | unit | [[spec.ct.state_independence_tested]] | repeated reduces of stateful transducers | repeated applications produce identical results |
+| p.transformer | unit | [[transducer.ct.transformer]] | wrapping calls of filtering/mapping over to_list | only matching or transformed items accumulate; re-wrapping is fresh |
+| p.compatibility_laws | law | [[transducer.ct.compatibility_laws]] | transducers over reducers | **identity:** init is preserved; **associativity:** complete/Reduced propagate through any nesting |
+| p.composition | unit | [[transducer.ct.composition]] | transducer triples composed both groupings | left-to-right data flow holds and both groupings agree |
+| p.identity | unit | [[transducer.ct.identity]] | compositions with and without identity | identity is neutral on both sides |
+| p.core_builtins | unit | [[transducer.ct.core_builtins]] | taking/dropping over varied n and inputs | slicing semantics, zero cases, negative-n errors, and early termination hold |
+| p.fresh_state | unit | [[transducer.ct.fresh_state]] | reusable transducer values applied multiple times | each wrapping tracks independent state; reuse never leaks state |
+| p.complete_order | unit | [[transducer.ct.complete_order]] | composed transducers with buffered layers | complete order is outermost-first with flushing before inward propagation |
+| p.state_independence_tested | unit | [[transducer.ct.state_independence_tested]] | repeated reduces of stateful transducers | repeated applications produce identical results |
 
 ## Purpose
 

@@ -1,5 +1,5 @@
 ---
-id: spec
+id: expression
 kind: intent
 statement: "THE system SHALL build deferred expression trees from a sealed Expr hierarchy with total type inference, shared-row evaluation, null-handling methods, and IEEE 754 NaN semantics"
 ---
@@ -10,18 +10,18 @@ statement: "THE system SHALL build deferred expression trees from a sealed Expr 
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| ex.hierarchy | invariant | The sealed Expr hierarchy is ColumnRef, Literal, BinOp, UnaryOp; all construction produces these variants | [[spec]] |
-| ex.deferred_construction | invariant | Expressions are built via column descriptors and operator overloading (comparisons, arithmetic, reversed ops, `&`/`\|`/`~`), never strings or lambdas, producing nested BinOp/UnaryOp trees | [[spec]] |
-| ex.eq_unhashable | invariant | `__eq__` returns a BinOp(EQ) expression, never bool; Expr is unhashable; `.equals(other)` provides structural bool comparison; collections store column-name strings | [[spec]] |
-| ex.evaluation | invariant | Exprs evaluate against the shared materialized row contract | [[spec]] |
-| ex.error_semantics | invariant | Missing columns raise `ColumnNotFoundError`; None operands raise `NullValueError` with remedies; Python runtime errors (ZeroDivisionError, TypeError) propagate naturally | [[spec]] |
-| ex.null_methods | invariant | `is_null()` returns a bool expression; `fill_null(default)` substitutes for None only in the expression it is applied to, never affecting other operands | [[spec]] |
-| ex.required_columns | invariant | `required_columns` is the union of referenced column names; Literal contributes the empty set | [[spec]] |
-| ex.type_inference | invariant | Result types follow the arithmetic/comparison/boolean decision tables with bool→int promotion, `str + str` only, `/` always float; Optional is treated as its base type; uninferable combinations raise `SchemaError` at construction | [[spec]] |
-| ex.bool_context | invariant | `__bool__` raises TypeError with the `.equals()`/`po.where()` guidance message in any boolean context | [[spec]] |
-| ex.no_short_circuit | invariant | `&`/`\|` build AST nodes and both operands are always evaluated at materialization; guarding is via chained where or fill_null | [[spec]] |
-| ex.nan_semantics | invariant | NaN is a valid float, not None: IEEE 754 comparisons (only `!=` true), NaN arithmetic yields NaN, is_null is False, fill_null preserves NaN; sort/distinct/groupby treat NaN per their specs | [[spec]] |
-| ex.fill_null_locality | invariant | In binary operations each Optional operand is handled independently; filling one side does not suppress `NullValueError` on the other | [[spec]] |
+| ex.hierarchy | invariant | The sealed Expr hierarchy is ColumnRef, Literal, BinOp, UnaryOp; all construction produces these variants | [[expression]] |
+| ex.deferred_construction | invariant | Expressions are built via column descriptors and operator overloading (comparisons, arithmetic, reversed ops, `&`/`\|`/`~`), never strings or lambdas, producing nested BinOp/UnaryOp trees | [[expression]] |
+| ex.eq_unhashable | invariant | `__eq__` returns a BinOp(EQ) expression, never bool; Expr is unhashable; `.equals(other)` provides structural bool comparison; collections store column-name strings | [[expression]] |
+| ex.evaluation | invariant | Exprs evaluate against the shared materialized row contract | [[expression]] |
+| ex.error_semantics | invariant | Missing columns raise `ColumnNotFoundError`; None operands raise `NullValueError` with remedies; Python runtime errors (ZeroDivisionError, TypeError) propagate naturally | [[expression]] |
+| ex.null_methods | invariant | `is_null()` returns a bool expression; `fill_null(default)` substitutes for None only in the expression it is applied to, never affecting other operands | [[expression]] |
+| ex.required_columns | invariant | `required_columns` is the union of referenced column names; Literal contributes the empty set | [[expression]] |
+| ex.type_inference | invariant | Result types follow the arithmetic/comparison/boolean decision tables with bool→int promotion, `str + str` only, `/` always float; Optional is treated as its base type; uninferable combinations raise `SchemaError` at construction | [[expression]] |
+| ex.bool_context | invariant | `__bool__` raises TypeError with the `.equals()`/`po.where()` guidance message in any boolean context | [[expression]] |
+| ex.no_short_circuit | invariant | `&`/`\|` build AST nodes and both operands are always evaluated at materialization; guarding is via chained where or fill_null | [[expression]] |
+| ex.nan_semantics | invariant | NaN is a valid float, not None: IEEE 754 comparisons (only `!=` true), NaN arithmetic yields NaN, is_null is False, fill_null preserves NaN; sort/distinct/groupby treat NaN per their specs | [[expression]] |
+| ex.fill_null_locality | invariant | In binary operations each Optional operand is handled independently; filling one side does not suppress `NullValueError` on the other | [[expression]] |
 
 ## Model
 
@@ -36,29 +36,29 @@ statement: "THE system SHALL build deferred expression trees from a sealed Expr 
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_build | constructed | constructed | [[spec.ex.deferred_construction]] |
-| t_evaluate | constructed | evaluating | [[spec.ex.evaluation]] |
-| t_raise_null | evaluating | null_encountered | [[spec.ex.error_semantics]] |
-| t_fill | null_encountered | result | [[spec.ex.null_methods]] |
-| t_nan | evaluating | result | [[spec.ex.nan_semantics]] |
-| t_infer | constructed | result | [[spec.ex.type_inference]] |
+| t_build | constructed | constructed | [[expression.ex.deferred_construction]] |
+| t_evaluate | constructed | evaluating | [[expression.ex.evaluation]] |
+| t_raise_null | evaluating | null_encountered | [[expression.ex.error_semantics]] |
+| t_fill | null_encountered | result | [[expression.ex.null_methods]] |
+| t_nan | evaluating | result | [[expression.ex.nan_semantics]] |
+| t_infer | constructed | result | [[expression.ex.type_inference]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.hierarchy | unit | [[spec.ex.hierarchy]] | expressions built via all construction paths | every node is one of the four variants |
-| p.deferred_construction | unit | [[spec.ex.deferred_construction]] | operator combinations including reversed and nested forms | trees match the operator semantics; evaluation matches Python arithmetic |
-| p.eq_unhashable | unit | [[spec.ex.eq_unhashable]] | equality and dict/set usage | `==` builds EQ trees; hashing raises; `.equals` returns bool |
-| p.evaluation | unit | [[spec.ex.evaluation]] | expressions over row dicts | results match the computed values |
-| p.error_semantics | unit | [[spec.ex.error_semantics]] | missing columns, None operands, zero division, type mismatches | each failure raises the specified error class and message |
-| p.null_methods | unit | [[spec.ex.null_methods]] | is_null/fill_null over None and non-None values | truth tables and substitution semantics hold |
-| p.required_columns | unit | [[spec.ex.required_columns]] | expression trees of every shape | required_columns is the correct name union |
-| p.type_inference | unit | [[spec.ex.type_inference]] | cells of the arithmetic/comparison/boolean tables with Optional operands | inferred types match the tables; invalid cells raise `SchemaError` |
-| p.bool_context | unit | [[spec.ex.bool_context]] | if/assert usage of Exprs | TypeError with the guidance message |
-| p.no_short_circuit | unit | [[spec.ex.no_short_circuit]] | guarded operands whose right side raises | both operands evaluate; chained-where guards avoid the error |
-| p.nan_semantics | unit | [[spec.ex.nan_semantics]] | NaN operands through comparisons, arithmetic, is_null, fill_null | IEEE 754 results and NaN-is-not-null behavior hold |
-| p.fill_null_locality | unit | [[spec.ex.fill_null_locality]] | binary ops with partially filled Optional operands | errors surface for the unfilled side only |
+| p.hierarchy | unit | [[expression.ex.hierarchy]] | expressions built via all construction paths | every node is one of the four variants |
+| p.deferred_construction | unit | [[expression.ex.deferred_construction]] | operator combinations including reversed and nested forms | trees match the operator semantics; evaluation matches Python arithmetic |
+| p.eq_unhashable | unit | [[expression.ex.eq_unhashable]] | equality and dict/set usage | `==` builds EQ trees; hashing raises; `.equals` returns bool |
+| p.evaluation | unit | [[expression.ex.evaluation]] | expressions over row dicts | results match the computed values |
+| p.error_semantics | unit | [[expression.ex.error_semantics]] | missing columns, None operands, zero division, type mismatches | each failure raises the specified error class and message |
+| p.null_methods | unit | [[expression.ex.null_methods]] | is_null/fill_null over None and non-None values | truth tables and substitution semantics hold |
+| p.required_columns | unit | [[expression.ex.required_columns]] | expression trees of every shape | required_columns is the correct name union |
+| p.type_inference | unit | [[expression.ex.type_inference]] | cells of the arithmetic/comparison/boolean tables with Optional operands | inferred types match the tables; invalid cells raise `SchemaError` |
+| p.bool_context | unit | [[expression.ex.bool_context]] | if/assert usage of Exprs | TypeError with the guidance message |
+| p.no_short_circuit | unit | [[expression.ex.no_short_circuit]] | guarded operands whose right side raises | both operands evaluate; chained-where guards avoid the error |
+| p.nan_semantics | unit | [[expression.ex.nan_semantics]] | NaN operands through comparisons, arithmetic, is_null, fill_null | IEEE 754 results and NaN-is-not-null behavior hold |
+| p.fill_null_locality | unit | [[expression.ex.fill_null_locality]] | binary ops with partially filled Optional operands | errors surface for the unfilled side only |
 
 ## Purpose
 

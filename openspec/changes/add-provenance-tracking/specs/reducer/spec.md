@@ -1,5 +1,5 @@
 ---
-id: spec
+id: reducer
 kind: intent
 statement: "THE system SHALL define a three-phase Reducer protocol with an optional invertible unstep method, guaranteed single complete() invocation, and a unstep(step()) round-trip law"
 ---
@@ -10,9 +10,9 @@ statement: "THE system SHALL define a three-phase Reducer protocol with an optio
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| red.three_phase | invariant | The Reducer protocol requires `init`, `step`, and `complete` with the specified pre/postconditions; `complete` is called exactly once per reduction, unwrapping `Reduced` immediately | [[spec]] |
-| red.unstep_optional | invariant | `unstep(acc, item)` is optional; invertible reducers support incremental recomputation on shrinking fibers, and consumers fall back to a full re-reduce for non-invertible reducers | [[spec]] |
-| red.unstep_law | invariant | For any invertible reducer, `unstep(step(acc, item), item) == acc`, verified by property-based test for every reducer implementing unstep | [[spec]] |
+| red.three_phase | invariant | The Reducer protocol requires `init`, `step`, and `complete` with the specified pre/postconditions; `complete` is called exactly once per reduction, unwrapping `Reduced` immediately | [[reducer]] |
+| red.unstep_optional | invariant | `unstep(acc, item)` is optional; invertible reducers support incremental recomputation on shrinking fibers, and consumers fall back to a full re-reduce for non-invertible reducers | [[reducer]] |
+| red.unstep_law | invariant | For any invertible reducer, `unstep(step(acc, item), item) == acc`, verified by property-based test for every reducer implementing unstep | [[reducer]] |
 
 ## Model
 
@@ -26,18 +26,18 @@ statement: "THE system SHALL define a three-phase Reducer protocol with an optio
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_init | empty | stepping | [[spec.red.three_phase]] |
-| t_step | stepping | stepping | [[spec.red.three_phase]] |
-| t_reduce | stepping | completed | [[spec.red.three_phase]] |
-| t_unstep | stepping | stepping | [[spec.red.unstep_law]] |
+| t_init | empty | stepping | [[reducer.red.three_phase]] |
+| t_step | stepping | stepping | [[reducer.red.three_phase]] |
+| t_reduce | stepping | completed | [[reducer.red.three_phase]] |
+| t_unstep | stepping | stepping | [[reducer.red.unstep_law]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.three_phase | unit | [[spec.red.three_phase]] | arbitrary item lists and reducers | complete is called exactly once; Reduced unwraps immediately |
-| p.unstep_optional | unit | [[spec.red.unstep_optional]] | shrinking fibers reduced with invertible and non-invertible reducers | incremental result equals full re-reduce; fallback path matches |
-| p.unstep_law | law | [[spec.red.unstep_law]] | arbitrary accumulators and previously stepped items | identity: `unstep(step(acc, item), item) == acc`; associativity: order of stepped items does not affect the unstepped accumulator |
+| p.three_phase | unit | [[reducer.red.three_phase]] | arbitrary item lists and reducers | complete is called exactly once; Reduced unwraps immediately |
+| p.unstep_optional | unit | [[reducer.red.unstep_optional]] | shrinking fibers reduced with invertible and non-invertible reducers | incremental result equals full re-reduce; fallback path matches |
+| p.unstep_law | law | [[reducer.red.unstep_law]] | arbitrary accumulators and previously stepped items | **identity:** `unstep(step(acc, item), item) == acc`; **associativity:** order of stepped items does not affect the unstepped accumulator |
 
 ## Purpose
 

@@ -1,5 +1,5 @@
 ---
-id: spec
+id: transducer
 kind: intent
 statement: "WHEN po.distinct is called THE system SHALL return a PipelineStep whose data component is a stateful dedup transducer with ttl/max_seen LRU eviction"
 ---
@@ -10,8 +10,8 @@ statement: "WHEN po.distinct is called THE system SHALL return a PipelineStep wh
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| fx.distinct_returns_step | invariant | `po.distinct(...)` returns a `PipelineStep`, not a bare Transducer; `ttl`/`max_seen` govern the data component's behavior only, not the factory's return type | [[spec]] |
-| fx.distinct_dedup_component | invariant | The data component is a stateful transducer passing only unique keys, evicting expired (ttl) or least-recently-seen (max_seen) keys under LRU policy | [[spec]] |
+| fx.distinct_returns_step | invariant | `po.distinct(...)` returns a `PipelineStep`, not a bare Transducer; `ttl`/`max_seen` govern the data component's behavior only, not the factory's return type | [[transducer]] |
+| fx.distinct_dedup_component | invariant | The data component is a stateful transducer passing only unique keys, evicting expired (ttl) or least-recently-seen (max_seen) keys under LRU policy | [[transducer]] |
 
 ## Model
 
@@ -25,16 +25,16 @@ statement: "WHEN po.distinct is called THE system SHALL return a PipelineStep wh
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_construct | constructed | deduplicating | [[spec.fx.distinct_returns_step]] |
-| t_pass_unique | deduplicating | deduplicating | [[spec.fx.distinct_dedup_component]] |
-| t_evict | deduplicating | evicted | [[spec.fx.distinct_dedup_component]] |
+| t_construct | constructed | deduplicating | [[transducer.fx.distinct_returns_step]] |
+| t_pass_unique | deduplicating | deduplicating | [[transducer.fx.distinct_dedup_component]] |
+| t_evict | deduplicating | evicted | [[transducer.fx.distinct_dedup_component]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.distinct_returns_step | unit | [[spec.fx.distinct_returns_step]] | distinct calls with and without ttl/max_seen | the result is a PipelineStep and not a Transducer instance |
-| p.distinct_dedup_component | unit | [[spec.fx.distinct_dedup_component]] | key streams crossing ttl/max_seen thresholds | unique keys pass once; eviction follows ttl/LRU policy |
+| p.distinct_returns_step | unit | [[transducer.fx.distinct_returns_step]] | distinct calls with and without ttl/max_seen | the result is a PipelineStep and not a Transducer instance |
+| p.distinct_dedup_component | unit | [[transducer.fx.distinct_dedup_component]] | key streams crossing ttl/max_seen thresholds | unique keys pass once; eviction follows ttl/LRU policy |
 
 ## Purpose
 

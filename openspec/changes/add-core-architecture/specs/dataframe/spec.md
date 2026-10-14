@@ -1,5 +1,5 @@
 ---
-id: spec
+id: dataframe
 kind: intent
 statement: "THE system SHALL provide an immutable, lazy DataFrame whose construction validates data and schema, whose plan re-executes fresh per materialization, and whose errors carry pipeline context"
 ---
@@ -10,31 +10,31 @@ statement: "THE system SHALL provide an immutable, lazy DataFrame whose construc
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| cd.construct_dict | invariant | Dict construction requires equal-length value lists (`ValueError` naming columns/lengths) and validates an optional schema against the data (`SchemaError` on mismatch) | [[spec]] |
-| cd.construct_rows | invariant | Row-list construction requires consistent keys across dicts; inconsistent keys raise `SchemaError` identifying the differing row | [[spec]] |
-| cd.empty_matrix | invariant | Empty construction follows the behavior matrix: `{}`/`[]` without schema are 0-column frames; empty columns require a schema; schema/data mismatches raise `SchemaError`; filtered-to-empty and head(0) preserve the schema | [[spec]] |
-| cd.iteration | invariant | `__iter__` yields independent dict copies in insertion order and `__len__` counts rows; both trigger materialization; `df.columns`/`df.schema` reflect post-plan schemas without materializing | [[spec]] |
-| cd.display | invariant | `repr`/`_repr_html_` show plan, schema, and a table materializing fully with first-5/last-5 truncation beyond 10 rows; display errors propagate | [[spec]] |
-| cd.no_series | invariant | A single column is a one-column DataFrame; no Series type exists | [[spec]] |
-| cd.error_quality | invariant | All DataFrame errors state what was expected, what was received, and a fix suggestion | [[spec]] |
-| cd.column_names | invariant | Column names must be non-empty strings; violations raise `SchemaError` | [[spec]] |
-| cd.explain | invariant | `explain()` describes plan steps and schema transforms without processing data; base and collected frames show an empty plan | [[spec]] |
-| cd.exports | invariant | `to_dict` (columnar) and `to_rows` (row format) preserve schema field order and trigger materialization; dict roundtrip reconstructs an equivalent frame | [[spec]] |
-| cd.pipe | invariant | `\|` returns a new DataFrame with the step appended, auto-lifting bare Transducers with Identity transform; other operands raise `TypeError`; the original is never mutated | [[spec]] |
-| cd.immutable_lazy | invariant | The API is an immutable value object; materialization triggers (repr, _repr_html_, iter, len, collect) execute the plan fresh with no internal cache; collect returns a new materialized frame | [[spec]] |
-| cd.head | invariant | `head(n)` appends taking(n) lifted with Identity transform; n=0 materializes 0 rows; negative n raises `ValueError` | [[spec]] |
-| cd.schema_property | invariant | `df.schema` returns the declared or dynamically inferred `@po.schema` class whose field access yields ColumnRef Exprs | [[spec]] |
-| cd.generic_typing | invariant | `DataFrame[Schema]` is accepted by `__class_getitem__` and returns the class unchanged at runtime | [[spec]] |
-| cd.reduce_surface | invariant | `po.reduce(reducer, df_or_iterable)` forces collection and accepts streaming-only `transducer=` (PipelineStep data component or Transducer); materializing steps raise `TypeError`; exhausted generators yield empty-input results | [[spec]] |
-| cd.auto_schemas | invariant | Schema-changing steps produce output schemas without materialization; auto-generated schemas compare structurally, never by identity | [[spec]] |
-| cd.defensive_copy | invariant | Construction shallow-copies input data; later mutations of the source do not affect the DataFrame | [[spec]] |
-| cd.thread_safety | invariant | Types are not thread-safe, except concurrent materialization of one DataFrame, which is safe via fresh per-execution state; concurrent source mutation is undefined | [[spec]] |
-| cd.wrapping_time | invariant | Transducers are stored in the plan and wrapped at materialization time, giving fresh chains, repeatable results, and concurrent safety | [[spec]] |
-| cd.reduce_collections | invariant | `po.reduce` accepts DataFrames and any Iterable of row dicts | [[spec]] |
-| cd.reexecution_doc | invariant | Every trigger re-executes the plan; `collect()` is the documented way to avoid re-execution | [[spec]] |
-| cd.iterative_wrapping | invariant | Pipeline execution wraps transducers iteratively with no fixed depth limit | [[spec]] |
-| cd.materialization_context | invariant | Errors during materialization name the pipeline step, its position, and the row index where available | [[spec]] |
-| cd.expr_validation | invariant | Step constructors validate Expr arguments at construction, raising `TypeError` with guidance for non-Expr values | [[spec]] |
+| cd.construct_dict | invariant | Dict construction requires equal-length value lists (`ValueError` naming columns/lengths) and validates an optional schema against the data (`SchemaError` on mismatch) | [[dataframe]] |
+| cd.construct_rows | invariant | Row-list construction requires consistent keys across dicts; inconsistent keys raise `SchemaError` identifying the differing row | [[dataframe]] |
+| cd.empty_matrix | invariant | Empty construction follows the behavior matrix: `{}`/`[]` without schema are 0-column frames; empty columns require a schema; schema/data mismatches raise `SchemaError`; filtered-to-empty and head(0) preserve the schema | [[dataframe]] |
+| cd.iteration | invariant | `__iter__` yields independent dict copies in insertion order and `__len__` counts rows; both trigger materialization; `df.columns`/`df.schema` reflect post-plan schemas without materializing | [[dataframe]] |
+| cd.display | invariant | `repr`/`_repr_html_` show plan, schema, and a table materializing fully with first-5/last-5 truncation beyond 10 rows; display errors propagate | [[dataframe]] |
+| cd.no_series | invariant | A single column is a one-column DataFrame; no Series type exists | [[dataframe]] |
+| cd.error_quality | invariant | All DataFrame errors state what was expected, what was received, and a fix suggestion | [[dataframe]] |
+| cd.column_names | invariant | Column names must be non-empty strings; violations raise `SchemaError` | [[dataframe]] |
+| cd.explain | invariant | `explain()` describes plan steps and schema transforms without processing data; base and collected frames show an empty plan | [[dataframe]] |
+| cd.exports | invariant | `to_dict` (columnar) and `to_rows` (row format) preserve schema field order and trigger materialization; dict roundtrip reconstructs an equivalent frame | [[dataframe]] |
+| cd.pipe | invariant | `\|` returns a new DataFrame with the step appended, auto-lifting bare Transducers with Identity transform; other operands raise `TypeError`; the original is never mutated | [[dataframe]] |
+| cd.immutable_lazy | invariant | The API is an immutable value object; materialization triggers (repr, _repr_html_, iter, len, collect) execute the plan fresh with no internal cache; collect returns a new materialized frame | [[dataframe]] |
+| cd.head | invariant | `head(n)` appends taking(n) lifted with Identity transform; n=0 materializes 0 rows; negative n raises `ValueError` | [[dataframe]] |
+| cd.schema_property | invariant | `df.schema` returns the declared or dynamically inferred `@po.schema` class whose field access yields ColumnRef Exprs | [[dataframe]] |
+| cd.generic_typing | invariant | `DataFrame[Schema]` is accepted by `__class_getitem__` and returns the class unchanged at runtime | [[dataframe]] |
+| cd.reduce_surface | invariant | `po.reduce(reducer, df_or_iterable)` forces collection and accepts streaming-only `transducer=` (PipelineStep data component or Transducer); materializing steps raise `TypeError`; exhausted generators yield empty-input results | [[dataframe]] |
+| cd.auto_schemas | invariant | Schema-changing steps produce output schemas without materialization; auto-generated schemas compare structurally, never by identity | [[dataframe]] |
+| cd.defensive_copy | invariant | Construction shallow-copies input data; later mutations of the source do not affect the DataFrame | [[dataframe]] |
+| cd.thread_safety | invariant | Types are not thread-safe, except concurrent materialization of one DataFrame, which is safe via fresh per-execution state; concurrent source mutation is undefined | [[dataframe]] |
+| cd.wrapping_time | invariant | Transducers are stored in the plan and wrapped at materialization time, giving fresh chains, repeatable results, and concurrent safety | [[dataframe]] |
+| cd.reduce_collections | invariant | `po.reduce` accepts DataFrames and any Iterable of row dicts | [[dataframe]] |
+| cd.reexecution_doc | invariant | Every trigger re-executes the plan; `collect()` is the documented way to avoid re-execution | [[dataframe]] |
+| cd.iterative_wrapping | invariant | Pipeline execution wraps transducers iteratively with no fixed depth limit | [[dataframe]] |
+| cd.materialization_context | invariant | Errors during materialization name the pipeline step, its position, and the row index where available | [[dataframe]] |
+| cd.expr_validation | invariant | Step constructors validate Expr arguments at construction, raising `TypeError` with guidance for non-Expr values | [[dataframe]] |
 
 ## Model
 
@@ -49,44 +49,44 @@ statement: "THE system SHALL provide an immutable, lazy DataFrame whose construc
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_construct | constructed | constructed | [[spec.cd.empty_matrix]] |
-| t_pipe | constructed | planned | [[spec.cd.pipe]] |
-| t_materialize | planned | materialized | [[spec.cd.immutable_lazy]] |
-| t_rewrap | materialized | materialized | [[spec.cd.wrapping_time]] |
-| t_reject | constructed | rejected | [[spec.cd.construct_dict]] |
-| t_reject_rows | constructed | rejected | [[spec.cd.construct_rows]] |
-| t_reject_names | constructed | rejected | [[spec.cd.column_names]] |
-| t_reduce | materialized | materialized | [[spec.cd.reduce_surface]] |
+| t_construct | constructed | constructed | [[dataframe.cd.empty_matrix]] |
+| t_pipe | constructed | planned | [[dataframe.cd.pipe]] |
+| t_materialize | planned | materialized | [[dataframe.cd.immutable_lazy]] |
+| t_rewrap | materialized | materialized | [[dataframe.cd.wrapping_time]] |
+| t_reject | constructed | rejected | [[dataframe.cd.construct_dict]] |
+| t_reject_rows | constructed | rejected | [[dataframe.cd.construct_rows]] |
+| t_reject_names | constructed | rejected | [[dataframe.cd.column_names]] |
+| t_reduce | materialized | materialized | [[dataframe.cd.reduce_surface]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.construct_dict | unit | [[spec.cd.construct_dict]] | dict inputs with equal/unequal lengths and schema matches | valid dicts construct; errors name columns, lengths, and schema diffs |
-| p.construct_rows | unit | [[spec.cd.construct_rows]] | row lists with consistent and inconsistent keys | consistent rows construct; inconsistent raise with the row identified |
-| p.empty_matrix | unit | [[spec.cd.empty_matrix]] | every row of the empty-construction matrix | each cell's result matches the table |
-| p.iteration | unit | [[spec.cd.iteration]] | iteration over planned and collected frames | independent copies, insertion order, and non-materializing schema access hold |
-| p.display | unit | [[spec.cd.display]] | frames of 3, 1000 rows, and erroring plans | table rendering, truncation, and error propagation match |
-| p.no_series | unit | [[spec.cd.no_series]] | single-column selections | result is a DataFrame |
-| p.error_quality | unit | [[spec.cd.error_quality]] | all DataFrame error paths | messages carry expected, actual, and suggestion |
-| p.column_names | unit | [[spec.cd.column_names]] | empty and non-string column names | `SchemaError` is raised |
-| p.explain | unit | [[spec.cd.explain]] | frames with and without plans | explain describes the plan without processing data |
-| p.exports | unit | [[spec.cd.exports]] | frames including empty ones, roundtripped | to_dict/to_rows shapes match and roundtrip is equivalent |
-| p.pipe | unit | [[spec.cd.pipe]] | pipes of steps, transducers, and invalid operands | new frames, auto-lifting, and `TypeError` hold; originals unchanged |
-| p.immutable_lazy | unit | [[spec.cd.immutable_lazy]] | repeated triggers on uncollected frames | plans re-execute fresh; collect isolates data |
-| p.head | unit | [[spec.cd.head]] | head over 0, positive, negative n | taking semantics with the specified errors |
-| p.schema_property | unit | [[spec.cd.schema_property]] | declared and inferred schema frames | df.schema yields the class with ColumnRef field access |
-| p.generic_typing | unit | [[spec.cd.generic_typing]] | DataFrame[Schema] subscription | runtime identity of the class object |
-| p.reduce_surface | unit | [[spec.cd.reduce_surface]] | reductions with streaming and materializing transducer args | streaming wraps; materializing raises; source plans fully execute |
-| p.auto_schemas | unit | [[spec.cd.auto_schemas]] | selects/derives compared structurally | schemas reflect output columns pre-materialization and compare structurally |
-| p.defensive_copy | unit | [[spec.cd.defensive_copy]] | source mutations after construction | frame data is unaffected |
-| p.thread_safety | unit | [[spec.cd.thread_safety]] | concurrent list(df) calls | both threads get correct independent results |
-| p.wrapping_time | unit | [[spec.cd.wrapping_time]] | repeated and concurrent materializations of stateful pipelines | results are identical and independent per execution |
-| p.reduce_collections | unit | [[spec.cd.reduce_collections]] | reductions over lists and generators | iterables reduce; exhausted generators give empty-input results |
-| p.reexecution_doc | unit | [[spec.cd.reexecution_doc]] | collect-then-trigger sequences | collected frames skip re-execution |
-| p.iterative_wrapping | unit | [[spec.cd.iterative_wrapping]] | very deep streaming pipelines | execution succeeds without recursion overflow |
-| p.materialization_context | unit | [[spec.cd.materialization_context]] | errors raised mid-plan | messages name step, position, and row index |
-| p.expr_validation | unit | [[spec.cd.expr_validation]] | constructor calls with bool values | `TypeError` with guidance at construction |
+| p.construct_dict | unit | [[dataframe.cd.construct_dict]] | dict inputs with equal/unequal lengths and schema matches | valid dicts construct; errors name columns, lengths, and schema diffs |
+| p.construct_rows | unit | [[dataframe.cd.construct_rows]] | row lists with consistent and inconsistent keys | consistent rows construct; inconsistent raise with the row identified |
+| p.empty_matrix | unit | [[dataframe.cd.empty_matrix]] | every row of the empty-construction matrix | each cell's result matches the table |
+| p.iteration | unit | [[dataframe.cd.iteration]] | iteration over planned and collected frames | independent copies, insertion order, and non-materializing schema access hold |
+| p.display | unit | [[dataframe.cd.display]] | frames of 3, 1000 rows, and erroring plans | table rendering, truncation, and error propagation match |
+| p.no_series | unit | [[dataframe.cd.no_series]] | single-column selections | result is a DataFrame |
+| p.error_quality | unit | [[dataframe.cd.error_quality]] | all DataFrame error paths | messages carry expected, actual, and suggestion |
+| p.column_names | unit | [[dataframe.cd.column_names]] | empty and non-string column names | `SchemaError` is raised |
+| p.explain | unit | [[dataframe.cd.explain]] | frames with and without plans | explain describes the plan without processing data |
+| p.exports | unit | [[dataframe.cd.exports]] | frames including empty ones, roundtripped | to_dict/to_rows shapes match and roundtrip is equivalent |
+| p.pipe | unit | [[dataframe.cd.pipe]] | pipes of steps, transducers, and invalid operands | new frames, auto-lifting, and `TypeError` hold; originals unchanged |
+| p.immutable_lazy | unit | [[dataframe.cd.immutable_lazy]] | repeated triggers on uncollected frames | plans re-execute fresh; collect isolates data |
+| p.head | unit | [[dataframe.cd.head]] | head over 0, positive, negative n | taking semantics with the specified errors |
+| p.schema_property | unit | [[dataframe.cd.schema_property]] | declared and inferred schema frames | df.schema yields the class with ColumnRef field access |
+| p.generic_typing | unit | [[dataframe.cd.generic_typing]] | DataFrame[Schema] subscription | runtime identity of the class object |
+| p.reduce_surface | unit | [[dataframe.cd.reduce_surface]] | reductions with streaming and materializing transducer args | streaming wraps; materializing raises; source plans fully execute |
+| p.auto_schemas | unit | [[dataframe.cd.auto_schemas]] | selects/derives compared structurally | schemas reflect output columns pre-materialization and compare structurally |
+| p.defensive_copy | unit | [[dataframe.cd.defensive_copy]] | source mutations after construction | frame data is unaffected |
+| p.thread_safety | unit | [[dataframe.cd.thread_safety]] | concurrent list(df) calls | both threads get correct independent results |
+| p.wrapping_time | unit | [[dataframe.cd.wrapping_time]] | repeated and concurrent materializations of stateful pipelines | results are identical and independent per execution |
+| p.reduce_collections | unit | [[dataframe.cd.reduce_collections]] | reductions over lists and generators | iterables reduce; exhausted generators give empty-input results |
+| p.reexecution_doc | unit | [[dataframe.cd.reexecution_doc]] | collect-then-trigger sequences | collected frames skip re-execution |
+| p.iterative_wrapping | unit | [[dataframe.cd.iterative_wrapping]] | very deep streaming pipelines | execution succeeds without recursion overflow |
+| p.materialization_context | unit | [[dataframe.cd.materialization_context]] | errors raised mid-plan | messages name step, position, and row index |
+| p.expr_validation | unit | [[dataframe.cd.expr_validation]] | constructor calls with bool values | `TypeError` with guidance at construction |
 
 ## Purpose
 

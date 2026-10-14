@@ -1,5 +1,5 @@
 ---
-id: spec
+id: pipeline
 kind: intent
 statement: "THE system SHALL compose reusable pipeline steps from validated Expr-based factories with pipe-time schema validation, exhaustive SchemaTransform handling, and materializing collection boundaries"
 ---
@@ -10,23 +10,23 @@ statement: "THE system SHALL compose reusable pipeline steps from validated Expr
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| cp.reusable | invariant | Composed steps are reusable across DataFrames and callable directly, returning lazy frames without forcing collection | [[spec]] |
-| cp.pipe_time_validation | invariant | Piping a step built for one schema to an incompatible frame raises `SchemaError` at pipe time naming the missing and available columns; lifted low-level transducers with Identity schema and no required_columns bypass the check | [[spec]] |
-| cp.composition_validation | invariant | Composing two steps validates that the first's output schema satisfies the second's required_columns per the transform semantics (Identity/Extend pass, Project/GroupBy restrict), raising `SchemaError` at composition time otherwise | [[spec]] |
-| cp.factories | invariant | High-level factories are `where`, `select`, `derive`, `sort_by`, `distinct`, `groupby`, and `comp`; each stores `required_columns` from its Expr trees; `select()` requires arguments, accepts only ColumnRefs, and deduplicates silently in first-occurrence order | [[spec]] |
-| cp.factory_only | invariant | PipelineStep has no public constructor accepting arbitrary pairs; steps come only from validated factories and `\|`; the DataOp is StreamingOp or MaterializingOp; composition preserves materializing dominance | [[spec]] |
-| cp.cross_layer | invariant | A bare Transducer composed with a PipelineStep is lifted to a step with Identity schema transform, then composition proceeds component-wise | [[spec]] |
-| cp.schema_transform_exhaustive | invariant | SchemaTransform is a sealed hierarchy (Identity, Project, GroupBy, Extend); matching code handles every variant with an unreachable default; tests exercise all variants and unsupported variants raise assertion-style errors | [[spec]] |
-| cp.transform_composition_table | invariant | All valid SchemaTransform pairs compose per the table; GroupBy ∘ GroupBy raises `SchemaError` directing to a single groupby call; invalid pairs raise `SchemaError` at composition | [[spec]] |
-| cp.comp | invariant | `comp(first=, second=)` composes left-to-right, equivalent to `\|`; no arguments returns the identity transducer | [[spec]] |
-| cp.sort_by | invariant | `sort_by(*exprs, descending=)` is materializing with Identity schema, accepting per-key bool or matching-length bool list; validates expressions before descending; sorts stably; empty frames stay empty; None keys raise `NullValueError` with remedies; chained sorts re-sort discarding earlier order | [[spec]] |
-| cp.derive | invariant | `derive(**named_exprs)` evaluates each Expr against the pre-derive row, appending Extend-typed columns; conflicts with existing columns raise `SchemaError` with recovery guidance; sibling cross-references raise with chaining guidance; no-args raises `ValueError`; Literal-only exprs are valid | [[spec]] |
-| cp.distinct | invariant | `distinct(*exprs)` keeps first occurrences in first-seen order with Identity schema; no-exprs compares all columns with empty required_columns; None keys are one group | [[spec]] |
-| cp.validation_scope | invariant | Pipe-time validation checks column existence only; type mismatches surface at materialization | [[spec]] |
-| cp.collection_boundary | invariant | Materializing steps act as collection boundaries: streaming steps feed their buffer, their output streams onward; multiple materializing steps create multiple boundaries | [[spec]] |
-| cp.bare_expr_pipe | invariant | `DataFrame \| Expr` raises `TypeError` with where/select guidance | [[spec]] |
-| cp.reduce_guidance | invariant | `po.reduce(..., transducer=materializing_step)` raises `TypeError` explaining the incompatibility and suggesting the pipeline form | [[spec]] |
-| cp.slice_bounds | invariant | `taking`/`dropping` accept non-negative integers: 0 yields empty/passthrough, negatives raise `ValueError`, large n is valid | [[spec]] |
+| cp.reusable | invariant | Composed steps are reusable across DataFrames and callable directly, returning lazy frames without forcing collection | [[pipeline]] |
+| cp.pipe_time_validation | invariant | Piping a step built for one schema to an incompatible frame raises `SchemaError` at pipe time naming the missing and available columns; lifted low-level transducers with Identity schema and no required_columns bypass the check | [[pipeline]] |
+| cp.composition_validation | invariant | Composing two steps validates that the first's output schema satisfies the second's required_columns per the transform semantics (Identity/Extend pass, Project/GroupBy restrict), raising `SchemaError` at composition time otherwise | [[pipeline]] |
+| cp.factories | invariant | High-level factories are `where`, `select`, `derive`, `sort_by`, `distinct`, `groupby`, and `comp`; each stores `required_columns` from its Expr trees; `select()` requires arguments, accepts only ColumnRefs, and deduplicates silently in first-occurrence order | [[pipeline]] |
+| cp.factory_only | invariant | PipelineStep has no public constructor accepting arbitrary pairs; steps come only from validated factories and `\|`; the DataOp is StreamingOp or MaterializingOp; composition preserves materializing dominance | [[pipeline]] |
+| cp.cross_layer | invariant | A bare Transducer composed with a PipelineStep is lifted to a step with Identity schema transform, then composition proceeds component-wise | [[pipeline]] |
+| cp.schema_transform_exhaustive | invariant | SchemaTransform is a sealed hierarchy (Identity, Project, GroupBy, Extend); matching code handles every variant with an unreachable default; tests exercise all variants and unsupported variants raise assertion-style errors | [[pipeline]] |
+| cp.transform_composition_table | invariant | All valid SchemaTransform pairs compose per the table; GroupBy ∘ GroupBy raises `SchemaError` directing to a single groupby call; invalid pairs raise `SchemaError` at composition | [[pipeline]] |
+| cp.comp | invariant | `comp(first=, second=)` composes left-to-right, equivalent to `\|`; no arguments returns the identity transducer | [[pipeline]] |
+| cp.sort_by | invariant | `sort_by(*exprs, descending=)` is materializing with Identity schema, accepting per-key bool or matching-length bool list; validates expressions before descending; sorts stably; empty frames stay empty; None keys raise `NullValueError` with remedies; chained sorts re-sort discarding earlier order | [[pipeline]] |
+| cp.derive | invariant | `derive(**named_exprs)` evaluates each Expr against the pre-derive row, appending Extend-typed columns; conflicts with existing columns raise `SchemaError` with recovery guidance; sibling cross-references raise with chaining guidance; no-args raises `ValueError`; Literal-only exprs are valid | [[pipeline]] |
+| cp.distinct | invariant | `distinct(*exprs)` keeps first occurrences in first-seen order with Identity schema; no-exprs compares all columns with empty required_columns; None keys are one group | [[pipeline]] |
+| cp.validation_scope | invariant | Pipe-time validation checks column existence only; type mismatches surface at materialization | [[pipeline]] |
+| cp.collection_boundary | invariant | Materializing steps act as collection boundaries: streaming steps feed their buffer, their output streams onward; multiple materializing steps create multiple boundaries | [[pipeline]] |
+| cp.bare_expr_pipe | invariant | `DataFrame \| Expr` raises `TypeError` with where/select guidance | [[pipeline]] |
+| cp.reduce_guidance | invariant | `po.reduce(..., transducer=materializing_step)` raises `TypeError` explaining the incompatibility and suggesting the pipeline form | [[pipeline]] |
+| cp.slice_bounds | invariant | `taking`/`dropping` accept non-negative integers: 0 yields empty/passthrough, negatives raise `ValueError`, large n is valid | [[pipeline]] |
 
 ## Model
 
@@ -42,35 +42,35 @@ statement: "THE system SHALL compose reusable pipeline steps from validated Expr
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_factory | constructed | constructed | [[spec.cp.factories]] |
-| t_compose | constructed | composed | [[spec.cp.composition_validation]] |
-| t_pipe | composed | piped | [[spec.cp.pipe_time_validation]] |
-| t_lift | constructed | constructed | [[spec.cp.cross_layer]] |
-| t_boundary | piped | materializing | [[spec.cp.collection_boundary]] |
-| t_reject_pipe | piped | rejected | [[spec.cp.bare_expr_pipe]] |
-| t_reject_compose | composed | rejected | [[spec.cp.transform_composition_table]] |
+| t_factory | constructed | constructed | [[pipeline.cp.factories]] |
+| t_compose | constructed | composed | [[pipeline.cp.composition_validation]] |
+| t_pipe | composed | piped | [[pipeline.cp.pipe_time_validation]] |
+| t_lift | constructed | constructed | [[pipeline.cp.cross_layer]] |
+| t_boundary | piped | materializing | [[pipeline.cp.collection_boundary]] |
+| t_reject_pipe | piped | rejected | [[pipeline.cp.bare_expr_pipe]] |
+| t_reject_compose | composed | rejected | [[pipeline.cp.transform_composition_table]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.reusable | unit | [[spec.cp.reusable]] | one pipeline applied to many frames | each application is correct and stays lazy |
-| p.pipe_time_validation | unit | [[spec.cp.pipe_time_validation]] | pipes to frames with missing columns and lifted transducers | `SchemaError` at pipe time for Expr steps; bypass for lifted low-level steps |
-| p.composition_validation | unit | [[spec.cp.composition_validation]] | step pairs across transform kinds | availability rules per transform; errors at composition time |
-| p.factories | unit | [[spec.cp.factories]] | every factory with valid and invalid arguments | required_columns, transforms, and argument validation match the spec |
-| p.factory_only | unit | [[spec.cp.factory_only]] | construction attempts and compositions | only factories create steps; dominance holds |
-| p.cross_layer | unit | [[spec.cp.cross_layer]] | transducer/step compositions in both orders | lifting adds Identity and composition is component-wise |
-| p.schema_transform_exhaustive | unit | [[spec.cp.schema_transform_exhaustive]] | matches over every variant plus an injected unknown | exhaustiveness failures surface statically or as assertion errors |
-| p.transform_composition_table | unit | [[spec.cp.transform_composition_table]] | every pair of transform variants | results or errors match the composition table |
-| p.comp | unit | [[spec.cp.comp]] | comp calls with zero, one, and two arguments | equivalence to `\|` and identity behavior hold |
-| p.sort_by | unit | [[spec.cp.sort_by]] | sorts over single, multiple, mixed-direction keys and edge inputs | ordering, stability, laziness, and error cases match |
-| p.derive | unit | [[spec.cp.derive]] | derives over single/multiple columns, conflicts, sibling refs, Literals | columns are added against pre-derive rows with the specified errors |
-| p.distinct | unit | [[spec.cp.distinct]] | distinct over all-columns, keyed, and empty frames | first-seen order, Identity schema, and None grouping hold |
-| p.validation_scope | unit | [[spec.cp.validation_scope]] | pipes with type-mismatched columns | no pipe-time error; materialization raises `TypeError` |
-| p.collection_boundary | unit | [[spec.cp.collection_boundary]] | pipelines mixing streaming and materializing steps | each materializing step collects fully before downstream streaming |
-| p.bare_expr_pipe | unit | [[spec.cp.bare_expr_pipe]] | `df \| expr` attempts | `TypeError` with guidance |
-| p.reduce_guidance | unit | [[spec.cp.reduce_guidance]] | materializing steps passed as transducer wrappers | `TypeError` explains and suggests the pipeline form |
-| p.slice_bounds | unit | [[spec.cp.slice_bounds]] | taking/dropping over 0, negative, and huge n | boundary semantics match the constraint |
+| p.reusable | unit | [[pipeline.cp.reusable]] | one pipeline applied to many frames | each application is correct and stays lazy |
+| p.pipe_time_validation | unit | [[pipeline.cp.pipe_time_validation]] | pipes to frames with missing columns and lifted transducers | `SchemaError` at pipe time for Expr steps; bypass for lifted low-level steps |
+| p.composition_validation | unit | [[pipeline.cp.composition_validation]] | step pairs across transform kinds | availability rules per transform; errors at composition time |
+| p.factories | unit | [[pipeline.cp.factories]] | every factory with valid and invalid arguments | required_columns, transforms, and argument validation match the spec |
+| p.factory_only | unit | [[pipeline.cp.factory_only]] | construction attempts and compositions | only factories create steps; dominance holds |
+| p.cross_layer | unit | [[pipeline.cp.cross_layer]] | transducer/step compositions in both orders | lifting adds Identity and composition is component-wise |
+| p.schema_transform_exhaustive | unit | [[pipeline.cp.schema_transform_exhaustive]] | matches over every variant plus an injected unknown | exhaustiveness failures surface statically or as assertion errors |
+| p.transform_composition_table | unit | [[pipeline.cp.transform_composition_table]] | every pair of transform variants | results or errors match the composition table |
+| p.comp | unit | [[pipeline.cp.comp]] | comp calls with zero, one, and two arguments | equivalence to `\|` and identity behavior hold |
+| p.sort_by | unit | [[pipeline.cp.sort_by]] | sorts over single, multiple, mixed-direction keys and edge inputs | ordering, stability, laziness, and error cases match |
+| p.derive | unit | [[pipeline.cp.derive]] | derives over single/multiple columns, conflicts, sibling refs, Literals | columns are added against pre-derive rows with the specified errors |
+| p.distinct | unit | [[pipeline.cp.distinct]] | distinct over all-columns, keyed, and empty frames | first-seen order, Identity schema, and None grouping hold |
+| p.validation_scope | unit | [[pipeline.cp.validation_scope]] | pipes with type-mismatched columns | no pipe-time error; materialization raises `TypeError` |
+| p.collection_boundary | unit | [[pipeline.cp.collection_boundary]] | pipelines mixing streaming and materializing steps | each materializing step collects fully before downstream streaming |
+| p.bare_expr_pipe | unit | [[pipeline.cp.bare_expr_pipe]] | `df \| expr` attempts | `TypeError` with guidance |
+| p.reduce_guidance | unit | [[pipeline.cp.reduce_guidance]] | materializing steps passed as transducer wrappers | `TypeError` explains and suggests the pipeline form |
+| p.slice_bounds | unit | [[pipeline.cp.slice_bounds]] | taking/dropping over 0, negative, and huge n | boundary semantics match the constraint |
 
 ## Purpose
 

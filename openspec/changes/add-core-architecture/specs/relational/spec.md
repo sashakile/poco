@@ -1,5 +1,5 @@
 ---
-id: spec
+id: relational
 kind: intent
 statement: "THE system SHALL provide lazy relational joins and groupby with restricted predicates, deterministic schemas and ordering, side-aware null semantics, and call-time validation"
 ---
@@ -10,20 +10,20 @@ statement: "THE system SHALL provide lazy relational joins and groupby with rest
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| co.join_predicate | invariant | `on` is restricted to ColumnRef equalities and conjunctions thereof, interpreted positionally; computed predicates raise `UnsupportedOperationError` at call time | [[spec]] |
-| co.join_how | invariant | `inner`, `left`, `right`, `outer` are supported with `how="inner"` default; invalid values raise `ValueError` listing options | [[spec]] |
-| co.join_null_semantics | invariant | Join treats None as non-matching (`None == None` is false); None-keyed rows survive only their own side in left/right/outer joins | [[spec]] |
-| co.groupby_keys | invariant | `groupby` takes direct ColumnRef keys plus aggregation kwargs; computed keys require prior `derive` and raise `ValueError`; no-aggregation calls raise `ValueError`; None keys group together; all-None keys form one group | [[spec]] |
-| co.groupby_endomorphism | invariant | `groupby(**aggregations)` returns a materializing PipelineStep preserving `DataFrame \| step -> DataFrame`; key-aggregation collisions raise `SchemaError` | [[spec]] |
-| co.output_schemas | invariant | Relational operations expose output schemas before collection: groupby exposes keys plus aggregation columns; join exposes keys once (left name), then remaining left/right columns | [[spec]] |
-| co.join_collision_suffixes | invariant | Colliding non-key columns get suffixes (default `("_left", "_right")`, customizable, self-join supported); unresolvable post-suffix collisions raise `SchemaError` at construction; only colliding non-key columns are suffixed | [[spec]] |
-| co.nullable_side_promotion | invariant | In left/right/outer joins, the non-preserved side's non-key columns are promoted to Optional variants | [[spec]] |
-| co.key_naming | invariant | The join key keeps the left-side column name; the right-side key column is dropped from the output | [[spec]] |
-| co.join_column_order | invariant | Join output order is: key columns (left names, on-expression order), remaining left columns, remaining right columns | [[spec]] |
-| co.join_row_order | invariant | Join rows are deterministic: for each left row in input order, matching right rows in right-input order | [[spec]] |
-| co.validation_timing | invariant | Join and groupby validate columns and predicate shapes at call/pipe time, before collection; failures compose into normal lazy pipelines afterwards | [[spec]] |
-| co.null_divergence | advisory | groupby treats None keys as equal while join never matches None — an intentional, documented divergence referenced by both semantics | [[spec]] |
-| co.join_validate | invariant | `validate` modes ("1:1", "1:N", "N:1") verify uniqueness at materialization raising `IntegrityError` naming side, duplicate keys, and mode | [[spec]] |
+| co.join_predicate | invariant | `on` is restricted to ColumnRef equalities and conjunctions thereof, interpreted positionally; computed predicates raise `UnsupportedOperationError` at call time | [[relational]] |
+| co.join_how | invariant | `inner`, `left`, `right`, `outer` are supported with `how="inner"` default; invalid values raise `ValueError` listing options | [[relational]] |
+| co.join_null_semantics | invariant | Join treats None as non-matching (`None == None` is false); None-keyed rows survive only their own side in left/right/outer joins | [[relational]] |
+| co.groupby_keys | invariant | `groupby` takes direct ColumnRef keys plus aggregation kwargs; computed keys require prior `derive` and raise `ValueError`; no-aggregation calls raise `ValueError`; None keys group together; all-None keys form one group | [[relational]] |
+| co.groupby_endomorphism | invariant | `groupby(**aggregations)` returns a materializing PipelineStep preserving `DataFrame \| step -> DataFrame`; key-aggregation collisions raise `SchemaError` | [[relational]] |
+| co.output_schemas | invariant | Relational operations expose output schemas before collection: groupby exposes keys plus aggregation columns; join exposes keys once (left name), then remaining left/right columns | [[relational]] |
+| co.join_collision_suffixes | invariant | Colliding non-key columns get suffixes (default `("_left", "_right")`, customizable, self-join supported); unresolvable post-suffix collisions raise `SchemaError` at construction; only colliding non-key columns are suffixed | [[relational]] |
+| co.nullable_side_promotion | invariant | In left/right/outer joins, the non-preserved side's non-key columns are promoted to Optional variants | [[relational]] |
+| co.key_naming | invariant | The join key keeps the left-side column name; the right-side key column is dropped from the output | [[relational]] |
+| co.join_column_order | invariant | Join output order is: key columns (left names, on-expression order), remaining left columns, remaining right columns | [[relational]] |
+| co.join_row_order | invariant | Join rows are deterministic: for each left row in input order, matching right rows in right-input order | [[relational]] |
+| co.validation_timing | invariant | Join and groupby validate columns and predicate shapes at call/pipe time, before collection; failures compose into normal lazy pipelines afterwards | [[relational]] |
+| co.null_divergence | advisory | groupby treats None keys as equal while join never matches None — an intentional, documented divergence referenced by both semantics | [[relational]] |
+| co.join_validate | invariant | `validate` modes ("1:1", "1:N", "N:1") verify uniqueness at materialization raising `IntegrityError` naming side, duplicate keys, and mode | [[relational]] |
 
 ## Model
 
@@ -38,31 +38,31 @@ statement: "THE system SHALL provide lazy relational joins and groupby with rest
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_construct_join | constructed | validated | [[spec.co.join_predicate]] |
-| t_construct_groupby | constructed | validated | [[spec.co.groupby_keys]] |
-| t_reject_predicate | constructed | constructed | [[spec.co.join_predicate]] |
-| t_materialize | validated | materializing | [[spec.co.validation_timing]] |
-| t_order | materializing | completed | [[spec.co.join_row_order]] |
-| t_validate_keys | materializing | materializing | [[spec.co.join_validate]] |
+| t_construct_join | constructed | validated | [[relational.co.join_predicate]] |
+| t_construct_groupby | constructed | validated | [[relational.co.groupby_keys]] |
+| t_reject_predicate | constructed | constructed | [[relational.co.join_predicate]] |
+| t_materialize | validated | materializing | [[relational.co.validation_timing]] |
+| t_order | materializing | completed | [[relational.co.join_row_order]] |
+| t_validate_keys | materializing | materializing | [[relational.co.join_validate]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.join_predicate | unit | [[spec.co.join_predicate]] | equality, conjunction, and computed predicates | only ColumnRef equalities are accepted positionally |
-| p.join_how | unit | [[spec.co.join_how]] | each how value plus invalid ones | modes preserve the correct side; invalid values raise `ValueError` |
-| p.join_null_semantics | unit | [[spec.co.join_null_semantics]] | keys containing None on either side | None never matches; outer-side preservation holds |
-| p.groupby_keys | unit | [[spec.co.groupby_keys]] | ColumnRef, computed, and missing keys; None-heavy data | named keys work; computed/absent raise; None groups unify |
-| p.groupby_endomorphism | unit | [[spec.co.groupby_endomorphism]] | groupby calls with and without aggregations | endomorphism holds; collisions and no-agg calls raise |
-| p.output_schemas | unit | [[spec.co.output_schemas]] | groupby and join results before collection | schemas are available without materialization |
-| p.join_collision_suffixes | unit | [[spec.co.join_collision_suffixes]] | schemas with colliding and non-colliding names, custom and identical suffixes | suffix rules and post-suffix `SchemaError` hold |
-| p.nullable_side_promotion | unit | [[spec.co.nullable_side_promotion]] | left/right/outer joins over non-Optional columns | the unpreserved side becomes Optional |
-| p.key_naming | unit | [[spec.co.key_naming]] | asymmetric and multi-key joins | left key name kept; right key column dropped |
-| p.join_column_order | unit | [[spec.co.join_column_order]] | joins with keys, collisions, and asymmetric schemas | column order follows the three-part rule |
-| p.join_row_order | unit | [[spec.co.join_row_order]] | joins over ordered inputs | row order is left-major, right-minor |
-| p.validation_timing | unit | [[spec.co.validation_timing]] | invalid joins/groupbys | errors raise before collection; valid results stay lazy |
-| p.null_divergence | unit | [[spec.co.null_divergence]] | same None-keyed data through groupby and join | groupby unifies; join does not match |
-| p.join_validate | unit | [[spec.co.join_validate]] | duplicate keys on left/right under each mode | `IntegrityError` names side, keys, and mode |
+| p.join_predicate | unit | [[relational.co.join_predicate]] | equality, conjunction, and computed predicates | only ColumnRef equalities are accepted positionally |
+| p.join_how | unit | [[relational.co.join_how]] | each how value plus invalid ones | modes preserve the correct side; invalid values raise `ValueError` |
+| p.join_null_semantics | unit | [[relational.co.join_null_semantics]] | keys containing None on either side | None never matches; outer-side preservation holds |
+| p.groupby_keys | unit | [[relational.co.groupby_keys]] | ColumnRef, computed, and missing keys; None-heavy data | named keys work; computed/absent raise; None groups unify |
+| p.groupby_endomorphism | unit | [[relational.co.groupby_endomorphism]] | groupby calls with and without aggregations | endomorphism holds; collisions and no-agg calls raise |
+| p.output_schemas | unit | [[relational.co.output_schemas]] | groupby and join results before collection | schemas are available without materialization |
+| p.join_collision_suffixes | unit | [[relational.co.join_collision_suffixes]] | schemas with colliding and non-colliding names, custom and identical suffixes | suffix rules and post-suffix `SchemaError` hold |
+| p.nullable_side_promotion | unit | [[relational.co.nullable_side_promotion]] | left/right/outer joins over non-Optional columns | the unpreserved side becomes Optional |
+| p.key_naming | unit | [[relational.co.key_naming]] | asymmetric and multi-key joins | left key name kept; right key column dropped |
+| p.join_column_order | unit | [[relational.co.join_column_order]] | joins with keys, collisions, and asymmetric schemas | column order follows the three-part rule |
+| p.join_row_order | unit | [[relational.co.join_row_order]] | joins over ordered inputs | row order is left-major, right-minor |
+| p.validation_timing | unit | [[relational.co.validation_timing]] | invalid joins/groupbys | errors raise before collection; valid results stay lazy |
+| p.null_divergence | unit | [[relational.co.null_divergence]] | same None-keyed data through groupby and join | groupby unifies; join does not match |
+| p.join_validate | unit | [[relational.co.join_validate]] | duplicate keys on left/right under each mode | `IntegrityError` names side, keys, and mode |
 
 ## Purpose
 

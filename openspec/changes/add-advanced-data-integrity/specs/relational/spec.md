@@ -1,5 +1,5 @@
 ---
-id: spec
+id: relational
 kind: intent
 statement: "WHEN a join is executed THE system SHALL support inner/left/right/outer modes with SQL-like None non-matching and optional validate modes that raise diagnostic IntegrityError"
 ---
@@ -10,10 +10,10 @@ statement: "WHEN a join is executed THE system SHALL support inner/left/right/ou
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| rel.join_modes | invariant | `inner`, `left`, `right`, `outer` joins are supported with `how` defaulting to `"inner"`; unsupported values raise `ValueError` listing valid options | [[spec]] |
-| rel.join_null_semantics | invariant | Join keys follow SQL-like truth tables: `None` matches nothing, including another None; None-keyed rows survive only their own side in outer/left/right joins | [[spec]] |
-| rel.join_validate | invariant | Optional `validate` in `{"1:1", "1:N", "N:1", "N:N"}` verifies the specified uniqueness at materialization time, raising `IntegrityError` on failure; "N:N" is the no-check default | [[spec]] |
-| rel.join_validate_context | invariant | A failed validation names the mode, the violating side(s), the first duplicate key values, and a resolution suggestion | [[spec]] |
+| rel.join_modes | invariant | `inner`, `left`, `right`, `outer` joins are supported with `how` defaulting to `"inner"`; unsupported values raise `ValueError` listing valid options | [[relational]] |
+| rel.join_null_semantics | invariant | Join keys follow SQL-like truth tables: `None` matches nothing, including another None; None-keyed rows survive only their own side in outer/left/right joins | [[relational]] |
+| rel.join_validate | invariant | Optional `validate` in `{"1:1", "1:N", "N:1", "N:N"}` verifies the specified uniqueness at materialization time, raising `IntegrityError` on failure; "N:N" is the no-check default | [[relational]] |
+| rel.join_validate_context | invariant | A failed validation names the mode, the violating side(s), the first duplicate key values, and a resolution suggestion | [[relational]] |
 
 ## Model
 
@@ -28,19 +28,19 @@ statement: "WHEN a join is executed THE system SHALL support inner/left/right/ou
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_construct | constructed | matching | [[spec.rel.join_modes]] |
-| t_match | matching | matching | [[spec.rel.join_null_semantics]] |
-| t_validate | matching | validated | [[spec.rel.join_validate]] |
-| t_reject | matching | rejected | [[spec.rel.join_validate_context]] |
+| t_construct | constructed | matching | [[relational.rel.join_modes]] |
+| t_match | matching | matching | [[relational.rel.join_null_semantics]] |
+| t_validate | matching | validated | [[relational.rel.join_validate]] |
+| t_reject | matching | rejected | [[relational.rel.join_validate_context]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.join_modes | unit | [[spec.rel.join_modes]] | join calls over each how value plus invalid ones | each mode joins correctly; invalid values raise `ValueError` |
-| p.join_null_semantics | unit | [[spec.rel.join_null_semantics]] | key columns containing None on either or both sides | None never matches; outer-side preservation holds |
-| p.join_validate | unit | [[spec.rel.join_validate]] | frames with and without duplicate keys under each validate mode | failures raise `IntegrityError` at materialization; N:N never checks |
-| p.join_validate_context | unit | [[spec.rel.join_validate_context]] | validation failures on left/right/both sides | the error names mode, side, duplicate keys, and suggestion |
+| p.join_modes | unit | [[relational.rel.join_modes]] | join calls over each how value plus invalid ones | each mode joins correctly; invalid values raise `ValueError` |
+| p.join_null_semantics | unit | [[relational.rel.join_null_semantics]] | key columns containing None on either or both sides | None never matches; outer-side preservation holds |
+| p.join_validate | unit | [[relational.rel.join_validate]] | frames with and without duplicate keys under each validate mode | failures raise `IntegrityError` at materialization; N:N never checks |
+| p.join_validate_context | unit | [[relational.rel.join_validate_context]] | validation failures on left/right/both sides | the error names mode, side, duplicate keys, and suggestion |
 
 ## Purpose
 

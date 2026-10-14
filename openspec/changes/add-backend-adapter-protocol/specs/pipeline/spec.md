@@ -1,5 +1,5 @@
 ---
-id: spec
+id: pipeline
 kind: intent
 statement: "WHEN a pipeline step is created THE system SHALL construct it only through validated factories whose data component carries both a backend-neutral LogicalOp and a pure-Python lowering"
 ---
@@ -10,11 +10,11 @@ statement: "WHEN a pipeline step is created THE system SHALL construct it only t
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| pipe.factory_only | invariant | PipelineStep has no public constructor accepting arbitrary pairs; steps are created only via validated factories and `\|` | [[spec]] |
-| pipe.dual_representation | invariant | Every step's data component is a DataOp carrying a sealed backend-neutral LogicalOp plus a pure-Python lowering (StreamingOp or MaterializingOp) | [[spec]] |
-| pipe.lowering_taxonomy | invariant | Streaming steps (where, select, derive, distinct) use StreamingOp; materializing steps (sort_by, groupby) use MaterializingOp | [[spec]] |
-| pipe.composition | invariant | Composing steps via `\|` yields a materializing step if either side is materializing, with LogicalOp sequence equal to the concatenation in pipe order | [[spec]] |
-| pipe.logical_op_pure | invariant | LogicalOp sequences are inspectable without processing row data; the pure-Python lowering remains the sole execution path when no backend is specified | [[spec]] |
+| pipe.factory_only | invariant | PipelineStep has no public constructor accepting arbitrary pairs; steps are created only via validated factories and `\|` | [[pipeline]] |
+| pipe.dual_representation | invariant | Every step's data component is a DataOp carrying a sealed backend-neutral LogicalOp plus a pure-Python lowering (StreamingOp or MaterializingOp) | [[pipeline]] |
+| pipe.lowering_taxonomy | invariant | Streaming steps (where, select, derive, distinct) use StreamingOp; materializing steps (sort_by, groupby) use MaterializingOp | [[pipeline]] |
+| pipe.composition | invariant | Composing steps via `\|` yields a materializing step if either side is materializing, with LogicalOp sequence equal to the concatenation in pipe order | [[pipeline]] |
+| pipe.logical_op_pure | invariant | LogicalOp sequences are inspectable without processing row data; the pure-Python lowering remains the sole execution path when no backend is specified | [[pipeline]] |
 
 ## Model
 
@@ -28,19 +28,19 @@ statement: "WHEN a pipeline step is created THE system SHALL construct it only t
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_factory | unconstructed | factory_built | [[spec.pipe.factory_only]] |
-| t_attach_op | factory_built | factory_built | [[spec.pipe.dual_representation]] |
-| t_compose | factory_built | composed | [[spec.pipe.composition]] |
+| t_factory | unconstructed | factory_built | [[pipeline.pipe.factory_only]] |
+| t_attach_op | factory_built | factory_built | [[pipeline.pipe.dual_representation]] |
+| t_compose | factory_built | composed | [[pipeline.pipe.composition]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.factory_only | unit | [[spec.pipe.factory_only]] | arbitrary factory calls | steps are only obtainable via factories and `\|` |
-| p.dual_representation | unit | [[spec.pipe.dual_representation]] | steps from every factory | the DataOp carries both a LogicalOp and a lowering |
-| p.lowering_taxonomy | unit | [[spec.pipe.lowering_taxonomy]] | each factory name | streaming vs materializing lowering assignment matches the spec |
-| p.composition | unit | [[spec.pipe.composition]] | pairs of steps composed with `\|` | materializing dominance and LogicalOp concatenation in pipe order hold |
-| p.logical_op_pure | unit | [[spec.pipe.logical_op_pure]] | pipelines inspected before materialization | LogicalOp sequences are computable without touching row data |
+| p.factory_only | unit | [[pipeline.pipe.factory_only]] | arbitrary factory calls | steps are only obtainable via factories and `\|` |
+| p.dual_representation | unit | [[pipeline.pipe.dual_representation]] | steps from every factory | the DataOp carries both a LogicalOp and a lowering |
+| p.lowering_taxonomy | unit | [[pipeline.pipe.lowering_taxonomy]] | each factory name | streaming vs materializing lowering assignment matches the spec |
+| p.composition | unit | [[pipeline.pipe.composition]] | pairs of steps composed with `\|` | materializing dominance and LogicalOp concatenation in pipe order hold |
+| p.logical_op_pure | unit | [[pipeline.pipe.logical_op_pure]] | pipelines inspected before materialization | LogicalOp sequences are computable without touching row data |
 
 ## Purpose
 

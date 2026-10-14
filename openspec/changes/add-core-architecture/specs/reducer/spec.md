@@ -1,5 +1,5 @@
 ---
-id: spec
+id: reducer
 kind: intent
 statement: "THE system SHALL define a three-phase Reducer protocol driven by po.reduce with Reduced early termination, law-compliant semantics, and defined empty-input behavior per built-in reducer"
 ---
@@ -10,13 +10,13 @@ statement: "THE system SHALL define a three-phase Reducer protocol driven by po.
 
 | id | kind | expr | traces_to |
 |----|------|------|-----------|
-| cr.three_phase | invariant | The Reducer protocol defines `init`, `step`, and `complete` with the specified pre/postconditions; `complete` is called exactly once per reduction, unwrapping `Reduced` immediately | [[spec]] |
-| cr.reduce_driver | invariant | `po.reduce(reducer, collection)` calls init once, step per item, complete once | [[spec]] |
-| cr.laws | invariant | Reducers satisfy determinism, empty-input validity for total reducers, resumability (`reduce(xs ++ ys) == resume(ys, state(xs))`), Reduced validity, and Reduced idempotence — verified by property tests | [[spec]] |
-| cr.reduced_sentinel | invariant | `Reduced(acc)` from step stops iteration and completes with the unwrapped accumulator; `Reduced(Reduced(v))` flattens on construction | [[spec]] |
-| cr.builtins | invariant | Built-in reducers are `to_list`, `count`, `sum_reducer`, `min_reducer`, `max_reducer`, `mean` | [[spec]] |
-| cr.empty_input_table | invariant | Empty-input behavior per the table: to_list/count/sum_reducer are total; mean/min_reducer/max_reducer raise `ValueError`; behavior holds however emptiness arises | [[spec]] |
-| cr.state_machine | invariant | The protocol state machine (Uninitialized→Stepping→Terminated/Completed) is a design contract enforced by the driver and transducer wrappers, not runtime guards; violations are undefined behavior | [[spec]] |
+| cr.three_phase | invariant | The Reducer protocol defines `init`, `step`, and `complete` with the specified pre/postconditions; `complete` is called exactly once per reduction, unwrapping `Reduced` immediately | [[reducer]] |
+| cr.reduce_driver | invariant | `po.reduce(reducer, collection)` calls init once, step per item, complete once | [[reducer]] |
+| cr.laws | invariant | Reducers satisfy determinism, empty-input validity for total reducers, resumability (`reduce(xs ++ ys) == resume(ys, state(xs))`), Reduced validity, and Reduced idempotence — verified by property tests | [[reducer]] |
+| cr.reduced_sentinel | invariant | `Reduced(acc)` from step stops iteration and completes with the unwrapped accumulator; `Reduced(Reduced(v))` flattens on construction | [[reducer]] |
+| cr.builtins | invariant | Built-in reducers are `to_list`, `count`, `sum_reducer`, `min_reducer`, `max_reducer`, `mean` | [[reducer]] |
+| cr.empty_input_table | invariant | Empty-input behavior per the table: to_list/count/sum_reducer are total; mean/min_reducer/max_reducer raise `ValueError`; behavior holds however emptiness arises | [[reducer]] |
+| cr.state_machine | invariant | The protocol state machine (Uninitialized→Stepping→Terminated/Completed) is a design contract enforced by the driver and transducer wrappers, not runtime guards; violations are undefined behavior | [[reducer]] |
 
 ## Model
 
@@ -31,23 +31,23 @@ statement: "THE system SHALL define a three-phase Reducer protocol driven by po.
 
 | id | from | to | guard |
 |----|------|----|-------|
-| t_init | uninitialized | stepping | [[spec.cr.reduce_driver]] |
-| t_step | stepping | stepping | [[spec.cr.laws]] |
-| t_reduce_early | stepping | terminated | [[spec.cr.reduced_sentinel]] |
-| t_complete | stepping | completed | [[spec.cr.three_phase]] |
-| t_complete_terminated | terminated | completed | [[spec.cr.three_phase]] |
+| t_init | uninitialized | stepping | [[reducer.cr.reduce_driver]] |
+| t_step | stepping | stepping | [[reducer.cr.laws]] |
+| t_reduce_early | stepping | terminated | [[reducer.cr.reduced_sentinel]] |
+| t_complete | stepping | completed | [[reducer.cr.three_phase]] |
+| t_complete_terminated | terminated | completed | [[reducer.cr.three_phase]] |
 
 ## Properties
 
 | id | kind | derives_from | generator | predicate |
 |----|------|--------------|-----------|-----------|
-| p.three_phase | unit | [[spec.cr.three_phase]] | reducers and item lists | complete is called exactly once; Reduced unwraps immediately |
-| p.reduce_driver | unit | [[spec.cr.reduce_driver]] | arbitrary reducers and iterables | sequencing is exactly one init, n steps, one complete |
-| p.laws | law | [[spec.cr.laws]] | arbitrary item lists and reducers | identity: same inputs give same step results; associativity: resumed folds equal single folds |
-| p.reduced_sentinel | unit | [[spec.cr.reduced_sentinel]] | reducers returning Reduced early | later items are unprocessed; nested Reduced flattens |
-| p.builtins | unit | [[spec.cr.builtins]] | each built-in reducer on sample inputs | results match the documented per-reducer behavior |
-| p.empty_input_table | unit | [[spec.cr.empty_input_table]] | empty inputs via lists, empty DataFrames, filtered-to-empty, head(0) | total reducers return their zero value; partial reducers raise the named ValueError |
-| p.state_machine | unit | [[spec.cr.state_machine]] | driver runs over valid reducers and iterables | sequencing is correct without any runtime ProtocolError guard |
+| p.three_phase | unit | [[reducer.cr.three_phase]] | reducers and item lists | complete is called exactly once; Reduced unwraps immediately |
+| p.reduce_driver | unit | [[reducer.cr.reduce_driver]] | arbitrary reducers and iterables | sequencing is exactly one init, n steps, one complete |
+| p.laws | law | [[reducer.cr.laws]] | arbitrary item lists and reducers | **identity:** same inputs give same step results; **associativity:** resumed folds equal single folds |
+| p.reduced_sentinel | unit | [[reducer.cr.reduced_sentinel]] | reducers returning Reduced early | later items are unprocessed; nested Reduced flattens |
+| p.builtins | unit | [[reducer.cr.builtins]] | each built-in reducer on sample inputs | results match the documented per-reducer behavior |
+| p.empty_input_table | unit | [[reducer.cr.empty_input_table]] | empty inputs via lists, empty DataFrames, filtered-to-empty, head(0) | total reducers return their zero value; partial reducers raise the named ValueError |
+| p.state_machine | unit | [[reducer.cr.state_machine]] | driver runs over valid reducers and iterables | sequencing is correct without any runtime ProtocolError guard |
 
 ## Purpose
 
